@@ -117,8 +117,8 @@ impl TransportUrl {
 
         let (socket_path, url_path) = if rest.starts_with('/') {
             // Absolute path: ///tmp/app.sock or ///tmp/app.sock/api
-            let path = &rest[1..]; // Remove leading slash (one of the //)
-            Self::extract_socket_path(path)
+            // rest is "/tmp/app.sock/..." - keep the leading slash for absolute paths
+            Self::extract_socket_path(rest)
         } else {
             // Relative path: //relative/path.sock
             Self::extract_socket_path(rest)
@@ -157,12 +157,12 @@ impl TransportUrl {
             format!(r"\\.\pipe\{}", rest.split('/').next().unwrap_or(rest))
         };
 
-        let url_path = if let Some(idx) = rest.find('/') {
+        let url_path: String = if let Some(idx) = rest.find('/') {
             if !rest.starts_with(r"\\") {
-                &rest[idx..]
+                rest[idx..].to_string()
             } else {
                 // For full pipe paths, find the path after pipe name
-                rest.splitn(2, '/').nth(1).map(|s| format!("/{}", s)).unwrap_or_else(|| "/".to_string()).as_str().to_string()
+                rest.splitn(2, '/').nth(1).map(|s| format!("/{}", s)).unwrap_or_else(|| "/".to_string())
             }
         } else {
             "/".to_string()

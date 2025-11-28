@@ -1,13 +1,13 @@
 [package]
 name = "rigging"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["The Servo Project Developers"]
 license = "MPL-2.0"
-description = "Transport layer library for Servo-based browsers - Unix sockets, named pipes, and composable transports"
+description = "Transport layer and stable embedding API for Servo-based applications"
 repository = "https://github.com/marctjones/rigging"
-keywords = ["servo", "transport", "unix-socket", "named-pipe", "networking"]
-categories = ["network-programming", "web-programming"]
+keywords = ["servo", "transport", "unix-socket", "browser", "embedding"]
+categories = ["network-programming", "web-programming", "gui"]
 
 [features]
 default = ["unix", "tcp"]
@@ -15,6 +15,10 @@ unix = []
 tcp = []
 tor = []
 named-pipe = []
+# Enable embedded Servo browser engine
+# When enabled, BrowserBuilder::run() will create actual browser windows
+# When disabled, it returns EmbedError::ServoNotAvailable
+servo = []
 
 [dependencies]
 # URL parsing
@@ -24,7 +28,7 @@ url = "2"
 tokio = { version = "1", features = ["net", "io-util", "sync"] }
 futures = "0.3"
 
-# Hyper integration
+# Hyper integration (for transport layer)
 hyper = { version = "1.4", features = ["client", "http1"] }
 hyper-util = { version = "0.1", features = ["client", "client-legacy", "tokio"] }
 http-body-util = "0.1"
@@ -39,6 +43,13 @@ log = "0.4"
 # Serialization (for Corsair IPC protocol)
 serde = { version = "1.0", features = ["derive"] }
 bincode = "1.3"
+
+# Servo browser engine (optional)
+# Uncomment when integrating with patched Servo fork:
+# servo = { git = "https://github.com/marctjones/servo", branch = "main", optional = true }
+
+# Windowing (for embedding API)
+# winit = { version = "0.30", optional = true }
 
 # Platform-specific
 [target.'cfg(unix)'.dependencies]

@@ -1,36 +1,38 @@
 # AI Agent Development Guide for Rigging
 
-This document provides instructions for AI coding assistants (Claude Code, Gemini, Cursor, etc.) working on the Rigging transport layer patches.
+This document provides instructions for AI coding assistants (Claude Code, Gemini, Cursor, etc.) working on Rigging.
 
 ## Project Overview
 
-**Rigging** is a patch set that adds extended network transport capabilities to Servo's network stack. It enables:
-- Transport-aware URL parsing (`http::unix:///tmp/app.sock/`)
-- Multiple transport backends (TCP, Unix sockets, Named pipes, Tor)
-- Composable transport chains
-- Async I/O via Tokio
+**Rigging** provides two main capabilities for Servo-based applications:
 
-**Important**: Rigging is NOT a standalone Rust library. It is a collection of patches applied to Servo.
+1. **Stable Embedding API** - A simple, stable interface for embedding Servo browser engine
+2. **Transport Layer** - Extended network transport support (Unix sockets, Named pipes, Tor)
 
 ## Repository Structure
 
 ```
 rigging/
-├── patches/                 # Git patches for Servo
-│   ├── 0001-transport-url.patch      # TransportUrl parsing
-│   ├── 0002-unix-connector.patch     # Unix socket connector
-│   ├── 0003-transport-types.patch    # Transport enum and types
-│   ├── 0004-http-loader.patch        # HTTP dispatch changes
-│   ├── 0005-net-lib.patch            # Module exports
-│   ├── 0006-net-cargo.patch          # Dependencies
-│   ├── 0007-shared-net-lib.patch     # Shared type exports
-│   └── 0008-tor-connector.patch      # Tor connector
-├── apply-patches.sh         # Apply patches to Servo
-├── regenerate-patches.sh    # Regenerate patches from fork
-├── src/                     # Reference implementation (legacy)
+├── src/
+│   ├── lib.rs                   # Main library entry point
+│   ├── transport_url.rs         # Transport-aware URL parsing
+│   ├── types.rs                 # Transport enum and types
+│   ├── unix_connector.rs        # Unix socket connector
+│   ├── tcp_connector.rs         # TCP connector
+│   ├── tor_connector.rs         # Tor connector (via Corsair)
+│   ├── composed.rs              # Transport composition
+│   └── embed/                   # Servo embedding API
+│       ├── mod.rs               # Embedding module entry
+│       ├── config.rs            # BrowserConfig
+│       ├── builder.rs           # BrowserBuilder
+│       ├── events.rs            # BrowserEvent types
+│       └── backend.rs           # Servo backend (internal)
+├── patches/                     # Git patches for Servo transport layer
+├── apply-patches.sh             # Apply patches to Servo
+├── regenerate-patches.sh        # Regenerate patches from fork
 ├── README.md
 ├── DESIGN.md
-└── IMPLEMENTATION_PLAN.md
+└── Cargo.toml
 ```
 
 ## Architecture
@@ -45,62 +47,90 @@ rigging/
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                  marctjones/servo (fork)                     │
-│                  - Upstream + Rigging patches                │
+│                  - Upstream + transport patches              │
 │                  - transport-layer branch                    │
 └──────────────────────────┬──────────────────────────────────┘
-                           │ depends on
+                           │ embedded via
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       Rigging                                │
+│                  - Stable embedding API                      │
+│                  - Transport URL parsing                     │
+│                  - Servo backend integration                 │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ used by
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              Harbor / Compass (applications)                 │
-│              - Use patched Servo for rendering               │
-│              - Extended transport capabilities               │
+│              - Single dependency on Rigging                  │
+│              - Stable API contract                           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
+## Key Design Principles
+
+### Stable API Boundary
+
+The `embed` module provides a **stable API** for embedding Servo:
+
+- **DO NOT** change public types without version bump
+- **DO NOT** expose Servo internal types
+- **DO** add new fields with defaults via builder pattern
+- **DO** keep all Servo-specific code in `backend.rs`
+
+When upgrading Servo, only `src/embed/backend.rs` should need changes.
+
+### Public API (STABLE)
+
+These are stable and should not change:
+
+```rust
+// From src/embed/
+pub struct BrowserConfig { ... }      // Configuration
+pub struct BrowserBuilder { ... }     // Builder pattern entry point
+pub enum BrowserEvent { ... }         // Events during operation
+pub enum EmbedError { ... }           // Error types
+```
+
+### Internal Implementation (MAY CHANGE)
+
+These may change between Servo versions:
+
+- `src/embed/backend.rs` - Servo integration code
+- Private helper functions
+- Internal error handling
+
 ## Development Workflow
 
-### Making Changes to Transport Layer
+### Working on Embedding API
 
-1. **Work in the Servo fork** (marctjones/servo):
+1. Make changes to `src/embed/*.rs`
+2. Run tests: `cargo test`
+3. Build: `cargo build`
+
+### Working on Transport Layer
+
+1. **For Servo patches**: Work in the Servo fork (marctjones/servo)
    ```bash
    cd /path/to/servo-fork
    git checkout transport-layer
    # Make changes to components/net/
-   git commit -m "Description of change"
+   git commit -m "Description"
    ```
 
 2. **Regenerate patches**:
    ```bash
-   cd /path/to/rigging
    ./regenerate-patches.sh /path/to/servo-fork
    git add patches/
    git commit -m "Update patches"
-   git push
    ```
 
-3. **Push servo fork changes**:
+3. **For Rigging transport code**: Work directly in `src/`
    ```bash
-   cd /path/to/servo-fork
-   git push origin transport-layer
+   # Edit src/unix_connector.rs, etc.
+   cargo test
+   cargo build
    ```
-
-### Applying Patches to Fresh Servo
-
-```bash
-git clone https://github.com/servo/servo.git
-./apply-patches.sh ./servo
-cd servo && cargo build --package servoshell
-```
-
-## Key Files in Servo (After Patching)
-
-| File | Purpose |
-|------|---------|
-| `components/net/transport_url.rs` | Transport-aware URL parsing |
-| `components/net/unix_connector.rs` | Unix Domain Socket connector |
-| `components/net/tor_connector.rs` | Tor connector via Corsair IPC |
-| `components/net/http_loader.rs` | Modified for multi-transport dispatch |
-| `components/shared/net/transport.rs` | Transport enum and TransportChain |
 
 ## Transport-Aware URLs
 
@@ -108,72 +138,81 @@ cd servo && cargo build --package servoshell
 scheme::transport//path/url_path
 
 Examples:
-http::unix///tmp/app.sock/api/v1     # Unix socket with absolute path
-http::unix//var/run/app.sock/        # Unix socket with relative path
+http::unix///tmp/app.sock/api/v1     # Unix socket (absolute path)
+http::unix//var/run/app.sock/        # Unix socket (relative path)
 http::pipe//myapp/api                # Windows named pipe
 http::tor//example.onion/            # Tor hidden service
 https::tcp//example.com/             # Standard TCP (explicit)
 ```
 
-## Adding a New Transport
-
-1. **Create connector in Servo fork**:
-   - Add `components/net/{transport}_connector.rs`
-   - Implement connector following `unix_connector.rs` pattern
-
-2. **Modify http_loader.rs**:
-   - Add dispatch logic for new transport type
-
-3. **Update shared types**:
-   - Add variant to `Transport` enum in `components/shared/net/transport.rs`
-
-4. **Regenerate patches**:
-   ```bash
-   ./regenerate-patches.sh /path/to/servo-fork
-   ```
-
 ## Common Commands
 
 ```bash
+# Build
+cargo build
+
+# Run tests
+cargo test
+
+# Check (faster than build)
+cargo check
+
 # Apply patches to Servo
 ./apply-patches.sh /path/to/servo
 
 # Regenerate patches from fork
 ./regenerate-patches.sh /path/to/servo-fork
-
-# Build patched Servo
-cd /path/to/servo && cargo build --package servoshell
-
-# Run tests for net component
-cd /path/to/servo && cargo test --package net
 ```
+
+## Adding a New Feature
+
+### To Embedding API
+
+1. Add field to `BrowserConfig` with default value
+2. Add builder method in `config.rs`
+3. Update `backend.rs` to use new field
+4. Add tests
+5. Update documentation
+
+### To Transport Layer
+
+1. Add transport variant in `types.rs` if needed
+2. Create connector in `src/{transport}_connector.rs`
+3. Update `composed.rs` for composition support
+4. Add tests
+5. If patching Servo, regenerate patches
 
 ## Integration Points
 
 ### With Corsair (Tor)
-- Rigging's `TorConnector` communicates with Corsair daemon
+
+- `TorConnector` communicates with Corsair daemon
 - Uses binary IPC protocol over Unix socket
 - Protocol: length-prefixed bincode messages
 
 ### With Harbor (Local Apps)
-- Applications use patched Servo's Unix socket support
+
+- Harbor depends on Rigging for browser embedding
+- Uses `BrowserBuilder` to create windows
 - URL format: `http::unix///tmp/app.sock/`
 
 ### With Compass (Browser)
-- Uses patched Servo for all network connections
-- Supports runtime transport switching via Corsair
+
+- Compass depends on Rigging for browser embedding
+- Full browser UI with Tor support
+- Uses Corsair for Tor connections
 
 ## Important Notes
 
-1. **Patch-based Development**: Always work in the Servo fork, then regenerate patches
-2. **No SOCKS5**: Tor connections use binary IPC, not SOCKS5
-3. **Platform Support**: Unix sockets on Linux/macOS, Named pipes on Windows
-4. **Upstream Tracking**: Periodically rebase fork on upstream Servo
+1. **Stable API Contract**: Never break `BrowserConfig`, `BrowserBuilder`, or `BrowserEvent`
+2. **Servo Isolation**: All Servo types stay in `backend.rs`
+3. **Patch Maintenance**: When updating Servo fork, regenerate patches
+4. **No SOCKS5**: Tor uses binary IPC, not SOCKS5
 
 ## Related Projects
 
 - [Servo](https://github.com/servo/servo) - Upstream browser engine
-- [marctjones/servo](https://github.com/marctjones/servo) - Fork with Rigging patches
-- [Corsair](https://github.com/marctjones/corsair) - Tor daemon
+- [marctjones/servo](https://github.com/marctjones/servo) - Fork with transport patches
 - [Harbor](https://github.com/marctjones/harbor) - Local app framework
 - [Compass](https://github.com/marctjones/compass) - Privacy browser
+- [Corsair](https://github.com/marctjones/corsair) - Tor daemon

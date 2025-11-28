@@ -1,43 +1,48 @@
 # Rigging
 
-Transport layer patches for the Servo browser engine.
+Transport layer and stable embedding API for the Servo browser engine.
 
-Rigging is a **patch set** that adds extended network transport capabilities to Servo, enabling:
+Rigging provides two main capabilities:
 
-- **Unix Domain Sockets** - Connect to local services over UDS (Linux/macOS)
-- **Named Pipes** - Connect to local services on Windows
-- **Tor Support** - Anonymous connections via the Corsair daemon
-- **Transport-aware URLs** - Encode transport type directly in URLs
+1. **Stable Embedding API** - A simple, stable interface for embedding Servo in applications
+2. **Transport Layer** - Extended network transport support (Unix sockets, Tor, etc.)
 
-## Overview
+## Stable Embedding API
 
-Rigging is NOT a standalone library. It is a collection of patches that modify Servo's network stack to support multiple transport mechanisms beyond standard TCP/HTTPS.
+Rigging provides a stable API layer that isolates applications from Servo's internal APIs. This makes it easier to upgrade Servo versions without rewriting your application code.
 
-### Repository Relationships
+```rust
+use rigging::embed::{BrowserBuilder, BrowserConfig};
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    servo/servo (upstream)                    │
-│                    - Base browser engine                     │
-│                    - TCP/HTTPS only                          │
-└──────────────────────────┬──────────────────────────────────┘
-                           │ patches from Rigging
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  marctjones/servo (fork)                     │
-│                  - Upstream + Rigging patches                │
-│                  - transport-layer branch                    │
-└──────────────────────────┬──────────────────────────────────┘
-                           │ depends on
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Harbor / Compass (applications)                 │
-│              - Use patched Servo for rendering               │
-│              - Extended transport capabilities               │
-└─────────────────────────────────────────────────────────────┘
+// Simple usage
+BrowserBuilder::new()
+    .url("http::unix///tmp/app.sock/")
+    .title("My App")
+    .size(1200, 800)
+    .run()?;
+
+// With full configuration
+let config = BrowserConfig::new("http://localhost/")
+    .with_title("My App")
+    .with_size(1200, 800)
+    .with_devtools(true);
+
+BrowserBuilder::new()
+    .config(config)
+    .on_event(|event| println!("Event: {:?}", event))
+    .run()?;
 ```
 
-## Transport URL Syntax
+### API Stability
+
+The embedding API is designed for stability:
+- `BrowserConfig` fields are stable; new fields have defaults
+- `BrowserBuilder` methods are stable
+- `BrowserEvent` variants are stable; new events may be added
+
+When upgrading Servo, only the internal `backend.rs` implementation needs changes.
+
+## Transport Layer
 
 Rigging extends standard URLs with transport specifications:
 
@@ -49,36 +54,95 @@ http::tor//example.onion              # Tor network
 http::pipe//myapp                     # Windows named pipe
 ```
 
-## Using Rigging
+### Transport URL Example
 
-### Option 1: Use the Pre-patched Fork (Recommended)
+```rust
+use rigging::{TransportUrl, Transport};
 
-The easiest approach is to depend on the already-patched Servo fork:
-
-```toml
-# Cargo.toml
-[dependencies]
-servo = { git = "https://github.com/marctjones/servo", branch = "transport-layer" }
+let url = TransportUrl::parse("http::unix///tmp/app.sock/api")?;
+assert_eq!(url.transport(), Transport::Unix);
+assert_eq!(url.unix_socket_path(), Some("/tmp/app.sock"));
 ```
 
-### Option 2: Apply Patches to Fresh Servo
+## Repository Relationships
 
-If you need to apply patches to a specific Servo version:
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    servo/servo (upstream)                    │
+│                    - Base browser engine                     │
+│                    - TCP/HTTPS only                          │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ patches from Rigging
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  marctjones/servo (fork)                     │
+│                  - Upstream + transport patches              │
+│                  - transport-layer branch                    │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ embedded via
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       Rigging                                │
+│                  - Stable embedding API                      │
+│                  - Transport URL parsing                     │
+│                  - Servo backend integration                 │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ used by
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Harbor / Compass (applications)                 │
+│              - Single dependency on Rigging                  │
+│              - Stable API contract                           │
+└─────────────────────────────────────────────────────────────┘
+```
 
-```bash
-# Clone upstream Servo
-git clone https://github.com/servo/servo.git
-cd servo
+## Feature Flags
 
-# Clone Rigging and apply patches
-git clone https://github.com/marctjones/rigging.git ../rigging
-../rigging/apply-patches.sh .
+- `unix` - Unix Domain Socket support (default)
+- `tcp` - TCP transport support (default)
+- `tor` - Tor transport via Corsair daemon
+- `named-pipe` - Windows Named Pipe support
+- `servo` - Enable embedded Servo browser engine
 
-# Build
-cargo build --package servoshell
+## Usage
+
+### As Embedding API (Recommended)
+
+Add Rigging as a dependency:
+
+```toml
+[dependencies]
+rigging = { git = "https://github.com/marctjones/rigging", features = ["unix"] }
+```
+
+Use the embedding API in your application:
+
+```rust
+use rigging::embed::{BrowserBuilder, BrowserConfig};
+
+fn main() -> Result<(), rigging::EmbedError> {
+    BrowserBuilder::new()
+        .url("http://localhost:8080/")
+        .title("My Application")
+        .run()
+}
+```
+
+### For Transport URL Parsing Only
+
+If you only need transport URL parsing without browser embedding:
+
+```rust
+use rigging::{TransportUrl, Transport};
+
+let url = TransportUrl::parse("http::unix///tmp/app.sock/api")?;
+println!("Transport: {:?}", url.transport());
+println!("Socket: {:?}", url.unix_socket_path());
 ```
 
 ## Patch Contents
+
+Rigging also provides patches for adding transport support to Servo:
 
 | Patch | Description |
 |-------|-------------|
@@ -90,17 +154,6 @@ cargo build --package servoshell
 | `0006-net-cargo.patch` | Dependencies (hyperlocal, etc.) |
 | `0007-shared-net-lib.patch` | Shared transport type exports |
 | `0008-tor-connector.patch` | Tor connector via Corsair IPC |
-
-## Maintaining Patches
-
-When the Servo fork is updated, regenerate patches:
-
-```bash
-./regenerate-patches.sh /path/to/servo-fork
-git add patches/
-git commit -m "Update patches from servo fork"
-git push
-```
 
 ## Related Projects
 
