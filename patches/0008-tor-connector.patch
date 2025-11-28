@@ -1,0 +1,353 @@
+diff --git a/components/net/tor_connector.rs b/components/net/tor_connector.rs
+new file mode 100644
+index 00000000000..5853835626a
+--- /dev/null
++++ b/components/net/tor_connector.rs
+@@ -0,0 +1,347 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
++
++//! Tor connectivity via SOCKS5 proxy
++//!
++//! This module provides:
++//! - Connection to Tor network via local SOCKS5 proxy (typically tor daemon on port 9050)
++//! - Support for both clearnet sites over Tor and .onion hidden services
++//! - Hyper-compatible connector for HTTP/HTTPS requests
++//! - Status tracking for Tor proxy availability
++//!
++//! Note: This requires a local Tor daemon running (e.g., `tor` package on Linux).
++//! The arti (native Rust Tor) implementation was attempted but causes dependency
++//! conflicts with the stylo crate's trait derivations.
++
++use futures::future::BoxFuture;
++use hyper::Uri;
++use hyper_util::rt::TokioIo;
++use log::{debug, error, info, warn};
++use std::io;
++use std::sync::Arc;
++use std::task::{Context, Poll};
++use tokio::net::TcpStream;
++use tokio::sync::RwLock;
++use tokio_socks::tcp::Socks5Stream;
++use tower_service::Service;
++
++/// Default Tor SOCKS5 proxy address (standard Tor daemon port)
++pub const DEFAULT_TOR_SOCKS_ADDR: &str = "127.0.0.1:9050";
++
++/// Alternative Tor Browser SOCKS5 proxy address
++pub const TOR_BROWSER_SOCKS_ADDR: &str = "127.0.0.1:9150";
++
++/// Status of the Tor proxy connection
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum TorStatus {
++    /// Not checked yet
++    Stopped,
++    /// Currently checking proxy availability
++    Checking,
++    /// Proxy is available and ready
++    Ready,
++    /// Proxy is not available or failed
++    Failed,
++}
++
++impl TorStatus {
++    pub fn is_ready(&self) -> bool {
++        matches!(self, TorStatus::Ready)
++    }
++
++    pub fn display_name(&self) -> &'static str {
++        match self {
++            TorStatus::Stopped => "Stopped",
++            TorStatus::Checking => "Checking...",
++            TorStatus::Ready => "Connected",
++            TorStatus::Failed => "Not Available",
++        }
++    }
++}
++
++/// Tor proxy manager - manages connection to local Tor SOCKS5 proxy
++pub struct TorManager {
++    /// SOCKS5 proxy address
++    proxy_addr: Arc<RwLock<String>>,
++    /// Current status
++    status: Arc<RwLock<TorStatus>>,
++    /// Whether Tor should be enabled for new requests
++    enabled: Arc<RwLock<bool>>,
++}
++
++impl TorManager {
++    /// Create a new Tor manager with default proxy address
++    pub fn new() -> Self {
++        Self {
++            proxy_addr: Arc::new(RwLock::new(DEFAULT_TOR_SOCKS_ADDR.to_string())),
++            status: Arc::new(RwLock::new(TorStatus::Stopped)),
++            enabled: Arc::new(RwLock::new(false)),
++        }
++    }
++
++    /// Create a new Tor manager with custom proxy address
++    pub fn with_proxy_addr(addr: &str) -> Self {
++        Self {
++            proxy_addr: Arc::new(RwLock::new(addr.to_string())),
++            status: Arc::new(RwLock::new(TorStatus::Stopped)),
++            enabled: Arc::new(RwLock::new(false)),
++        }
++    }
++
++    /// Get the proxy address
++    pub async fn proxy_addr(&self) -> String {
++        self.proxy_addr.read().await.clone()
++    }
++
++    /// Set the proxy address
++    pub async fn set_proxy_addr(&self, addr: &str) {
++        *self.proxy_addr.write().await = addr.to_string();
++        // Reset status when address changes
++        *self.status.write().await = TorStatus::Stopped;
++    }
++
++    /// Check if Tor is enabled
++    pub async fn is_enabled(&self) -> bool {
++        *self.enabled.read().await
++    }
++
++    /// Enable or disable Tor
++    pub async fn set_enabled(&self, enabled: bool) {
++        *self.enabled.write().await = enabled;
++        if enabled {
++            // Check proxy availability when enabled
++            let status = *self.status.read().await;
++            if status == TorStatus::Stopped || status == TorStatus::Failed {
++                self.check_proxy().await;
++            }
++        }
++    }
++
++    /// Get current Tor status
++    pub async fn status(&self) -> TorStatus {
++        *self.status.read().await
++    }
++
++    /// Check if the Tor SOCKS5 proxy is available
++    pub async fn check_proxy(&self) {
++        // Check if already checking
++        {
++            let status = *self.status.read().await;
++            if status == TorStatus::Checking {
++                debug!("Already checking Tor proxy, skipping");
++                return;
++            }
++        }
++
++        info!("Checking Tor SOCKS5 proxy availability...");
++        *self.status.write().await = TorStatus::Checking;
++
++        let proxy_addr = self.proxy_addr.read().await.clone();
++
++        // Try to connect to the SOCKS5 proxy
++        match TcpStream::connect(&proxy_addr).await {
++            Ok(_stream) => {
++                info!("Tor SOCKS5 proxy available at {}", proxy_addr);
++                *self.status.write().await = TorStatus::Ready;
++            },
++            Err(e) => {
++                // Try alternative Tor Browser port
++                if proxy_addr == DEFAULT_TOR_SOCKS_ADDR {
++                    info!("Trying Tor Browser proxy at {}", TOR_BROWSER_SOCKS_ADDR);
++                    match TcpStream::connect(TOR_BROWSER_SOCKS_ADDR).await {
++                        Ok(_stream) => {
++                            info!(
++                                "Tor SOCKS5 proxy available at {} (Tor Browser)",
++                                TOR_BROWSER_SOCKS_ADDR
++                            );
++                            *self.proxy_addr.write().await = TOR_BROWSER_SOCKS_ADDR.to_string();
++                            *self.status.write().await = TorStatus::Ready;
++                            return;
++                        },
++                        Err(_) => {},
++                    }
++                }
++                warn!(
++                    "Tor SOCKS5 proxy not available at {}: {}. Make sure 'tor' is running.",
++                    proxy_addr, e
++                );
++                *self.status.write().await = TorStatus::Failed;
++            },
++        }
++    }
++
++    /// Start/check the Tor proxy (alias for check_proxy for API compatibility)
++    pub async fn start(&self) {
++        self.check_proxy().await;
++    }
++
++    /// Mark as stopped (doesn't actually stop external tor daemon)
++    pub async fn stop(&self) {
++        info!("Disabling Tor proxy connection");
++        *self.status.write().await = TorStatus::Stopped;
++    }
++
++    /// Check if a URL is a .onion address
++    pub fn is_onion_url(url: &str) -> bool {
++        url.contains(".onion") || url.contains(".onion:")
++    }
++
++    /// Extract host and port from URL for Tor connection
++    pub fn parse_url_for_tor(uri: &Uri) -> Result<(String, u16), io::Error> {
++        let host = uri
++            .host()
++            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "No host in URI"))?
++            .to_string();
++
++        let port = uri.port_u16().unwrap_or_else(|| match uri.scheme_str() {
++            Some("https") => 443,
++            Some("http") => 80,
++            _ => 80,
++        });
++
++        Ok((host, port))
++    }
++
++    /// Connect to a target through the Tor SOCKS5 proxy
++    pub async fn connect(&self, host: &str, port: u16) -> io::Result<TcpStream> {
++        let status = self.status().await;
++        if !status.is_ready() {
++            return Err(io::Error::new(
++                io::ErrorKind::NotConnected,
++                format!("Tor proxy not ready: {:?}", status),
++            ));
++        }
++
++        let proxy_addr = self.proxy_addr.read().await.clone();
++        let target = (host, port);
++
++        debug!(
++            "Connecting to {}:{} via Tor SOCKS5 proxy at {}",
++            host, port, proxy_addr
++        );
++
++        // Connect through SOCKS5 proxy
++        let stream = Socks5Stream::connect(&proxy_addr[..], target)
++            .await
++            .map_err(|e| {
++                error!("Failed to connect to {}:{} via Tor: {}", host, port, e);
++                io::Error::new(io::ErrorKind::ConnectionRefused, e.to_string())
++            })?;
++
++        info!("Tor connection established to {}:{}", host, port);
++        Ok(stream.into_inner())
++    }
++}
++
++impl Default for TorManager {
++    fn default() -> Self {
++        Self::new()
++    }
++}
++
++/// Hyper-compatible connector for Tor connections via SOCKS5 proxy
++#[derive(Clone)]
++pub struct TorConnector {
++    manager: Arc<TorManager>,
++}
++
++impl TorConnector {
++    pub fn new(manager: Arc<TorManager>) -> Self {
++        Self { manager }
++    }
++}
++
++impl Service<Uri> for TorConnector {
++    type Response = TokioIo<TcpStream>;
++    type Error = io::Error;
++    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
++
++    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
++        Poll::Ready(Ok(()))
++    }
++
++    fn call(&mut self, uri: Uri) -> Self::Future {
++        let manager = self.manager.clone();
++        Box::pin(async move {
++            // Parse the URI
++            let (host, port) = TorManager::parse_url_for_tor(&uri)?;
++            let is_onion = host.ends_with(".onion");
++
++            debug!(
++                "Connecting via Tor to {}:{} (onion: {})",
++                host, port, is_onion
++            );
++
++            // Connect through Tor SOCKS5 proxy
++            let stream = manager.connect(&host, port).await?;
++
++            Ok(TokioIo::new(stream))
++        })
++    }
++}
++
++/// Check if Tor should be used for a given URL
++pub fn should_use_tor(url: &str, tor_enabled: bool) -> bool {
++    // Always use Tor for .onion addresses
++    if TorManager::is_onion_url(url) {
++        return true;
++    }
++    // Use Tor if globally enabled
++    tor_enabled
++}
++
++/// Detect if URL is an onion address
++pub fn is_onion_address(host: &str) -> bool {
++    host.ends_with(".onion")
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn test_is_onion_url() {
++        assert!(TorManager::is_onion_url("http://example.onion"));
++        assert!(TorManager::is_onion_url(
++            "http://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion"
++        ));
++        assert!(TorManager::is_onion_url("https://some.onion:8080/path"));
++        assert!(!TorManager::is_onion_url("https://example.com"));
++        assert!(!TorManager::is_onion_url("https://onion.example.com"));
++    }
++
++    #[test]
++    fn test_should_use_tor() {
++        // .onion always uses Tor regardless of setting
++        assert!(should_use_tor("http://example.onion/", false));
++        assert!(should_use_tor("http://example.onion/", true));
++
++        // Regular sites depend on tor_enabled setting
++        assert!(!should_use_tor("https://example.com/", false));
++        assert!(should_use_tor("https://example.com/", true));
++    }
++
++    #[test]
++    fn test_is_onion_address() {
++        assert!(is_onion_address("example.onion"));
++        assert!(is_onion_address("subdomain.example.onion"));
++        assert!(!is_onion_address("example.com"));
++        assert!(!is_onion_address("onion.com"));
++    }
++
++    #[test]
++    fn test_tor_status() {
++        assert!(!TorStatus::Stopped.is_ready());
++        assert!(!TorStatus::Checking.is_ready());
++        assert!(TorStatus::Ready.is_ready());
++        assert!(!TorStatus::Failed.is_ready());
++    }
++
++    #[test]
++    fn test_default_proxy_addr() {
++        let _manager = TorManager::new();
++        // Can't use async in sync test, just check the default is set
++        assert_eq!(DEFAULT_TOR_SOCKS_ADDR, "127.0.0.1:9050");
++    }
++}

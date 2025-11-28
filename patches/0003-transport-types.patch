@@ -1,0 +1,68 @@
+diff --git a/components/shared/net/transport.rs b/components/shared/net/transport.rs
+new file mode 100644
+index 00000000000..84739340b4f
+--- /dev/null
++++ b/components/shared/net/transport.rs
+@@ -0,0 +1,62 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
++
++//! Transport layer types for network requests
++
++use malloc_size_of_derive::MallocSizeOf;
++use serde::{Deserialize, Serialize};
++use std::fmt;
++
++/// Transport layer for network connections
++#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Deserialize, Serialize, MallocSizeOf)]
++pub enum Transport {
++    /// TCP/IP networking (default for most schemes)
++    Tcp,
++    /// Unix domain sockets (IPC)
++    Unix,
++    /// Future: QUIC transport
++    Quic,
++    /// Tor network (anonymous routing via Arti)
++    Tor,
++}
++
++impl Transport {
++    /// Parse transport from string
++    pub fn from_str(s: &str) -> Option<Self> {
++        match s.to_lowercase().as_str() {
++            "tcp" => Some(Transport::Tcp),
++            "unix" | "uds" | "ipc" => Some(Transport::Unix),
++            "quic" => Some(Transport::Quic),
++            "tor" | "onion" => Some(Transport::Tor),
++            _ => None,
++        }
++    }
++
++    /// Check if this is an anonymous transport
++    pub fn is_anonymous(&self) -> bool {
++        matches!(self, Transport::Tor)
++    }
++
++    /// Check if this transport requires special handling for .onion addresses
++    pub fn supports_onion(&self) -> bool {
++        matches!(self, Transport::Tor)
++    }
++}
++
++impl fmt::Display for Transport {
++    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        match self {
++            Transport::Tcp => write!(f, "tcp"),
++            Transport::Unix => write!(f, "unix"),
++            Transport::Quic => write!(f, "quic"),
++            Transport::Tor => write!(f, "tor"),
++        }
++    }
++}
++
++impl Default for Transport {
++    fn default() -> Self {
++        Transport::Tcp
++    }
++}
