@@ -10,14 +10,22 @@ keywords = ["servo", "transport", "unix-socket", "browser", "embedding"]
 categories = ["network-programming", "web-programming", "gui"]
 
 [features]
+# Default: transport layer only, no browser engine
+# Applications choose their browser backend explicitly
 default = ["unix", "tcp"]
 unix = []
 tcp = []
 tor = []
 named-pipe = []
-# Enable embedded Servo browser engine
-# When enabled, BrowserBuilder::run() will create actual browser windows
-# When disabled, it returns EmbedError::ServoNotAvailable
+# Enable webview browser using system webview (WebKitGTK on Linux)
+# NOTE: This requires system dependencies (javascriptcoregtk-4.1 on Linux)
+# NOT RECOMMENDED - Use Servo instead for full control
+webview = ["wry", "tao"]
+# Enable Servo browser engine (launches pre-built servo binary as subprocess)
+# When enabled, BrowserBuilder::run() will launch servo to display web content
+# This is the recommended backend for Harbor and Compass
+# Note: Requires servo binary to be built and available in PATH or at
+#       /home/marc/servo/target/release/servo
 servo = []
 
 [dependencies]
@@ -44,12 +52,12 @@ log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 bincode = "1.3"
 
-# Servo browser engine (optional)
-# Uncomment when integrating with patched Servo fork:
-# servo = { git = "https://github.com/marctjones/servo", branch = "main", optional = true }
+# Webview (interim solution using system webview)
+wry = { version = "0.53", optional = true }
+tao = { version = "0.33", optional = true }
 
-# Windowing (for embedding API)
-# winit = { version = "0.30", optional = true }
+# Servo browser engine runs as subprocess - no library dependency needed
+# The servo binary must be pre-built and available
 
 # Platform-specific
 [target.'cfg(unix)'.dependencies]

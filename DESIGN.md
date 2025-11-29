@@ -82,25 +82,47 @@ Components:
 
 ## Transport Implementations
 
-### TCP Connector (Existing Servo)
+### Status Overview
+
+| Transport | Status | Crate | Notes |
+|-----------|--------|-------|-------|
+| **TCP** | ✅ Implemented | hyper (existing) | Servo's default, unmodified |
+| **Unix** | ✅ Implemented | hyperlocal | Linux, macOS only |
+| **Named Pipe** | 🚧 Planned | tokio (windows) | Windows only |
+| **Tor** | 🚧 Planned | custom IPC | Via Corsair daemon |
+| **SSH** | 📋 Future | russh | SSH tunneling |
+| **QUIC** | 📋 Future | quinn | HTTP/3 support |
+
+### TCP Connector (Existing Servo) ✅
 - Standard TCP socket connection via hyper
 - Unmodified from upstream Servo
 
-### Unix Connector (Rigging Addition)
+### Unix Connector (Rigging Addition) ✅
 - Unix Domain Socket connection
 - Uses `hyperlocal` crate for hyper integration
 - Linux and macOS only
 - Socket path extracted from URL
 
-### Named Pipe Connector (Planned)
+### Named Pipe Connector 🚧
 - Windows Named Pipe connection
 - Similar pattern to Unix connector
 - Windows only
+- Uses tokio's Windows named pipe support
 
-### Tor Connector (Rigging Addition)
+### Tor Connector 🚧
 - Connects via Corsair daemon
 - Binary IPC protocol over Unix socket
 - **Not SOCKS5** - uses custom protocol for efficiency
+
+### SSH Tunnel Connector 📋
+- SSH tunneling for connections
+- Uses `russh` crate (pure Rust SSH)
+- Useful for accessing remote services securely
+
+### QUIC Connector 📋
+- QUIC/HTTP3 protocol support
+- Uses `quinn` crate
+- Modern, multiplexed connections
 
 ## Binary IPC Protocol (Tor/Corsair)
 
@@ -173,9 +195,21 @@ Rigging patches must be rebased when upstream Servo changes:
 3. **No Plaintext Secrets**: Never log sensitive data in transport code
 4. **Path Validation**: Unix socket paths are validated before connection
 
-## Future Extensions
+## Implementation Roadmap
 
-1. **QUIC Support**: Via `quinn` crate
-2. **SSH Tunneling**: Via `russh` crate
-3. **Named Pipe Completion**: Full Windows support
-4. **Connection Pooling**: Per-transport connection pools
+### Near-Term (Planned)
+
+| Feature | Crate | Priority | Notes |
+|---------|-------|----------|-------|
+| Named Pipe Connector | tokio | High | Windows parity with Unix |
+| Tor Connector | custom | High | Required for Compass |
+| Connection Pooling | - | Medium | Per-transport pools |
+
+### Future Extensions
+
+| Feature | Crate | Priority | Notes |
+|---------|-------|----------|-------|
+| QUIC/HTTP3 | quinn | Medium | Modern protocol support |
+| SSH Tunneling | russh | Low | Secure remote access |
+| Transport Chaining | - | Low | Compose transports (e.g., `tor+unix`) |
+| WebTransport | - | Low | W3C WebTransport API |

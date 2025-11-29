@@ -100,4 +100,4 @@ pub use types::{Transport, TransportChain, TransportError};
 pub use unix_connector::UnixConnector;
 
 // Embedding API re-exports (for convenience)
-pub use embed::{BrowserBuilder, BrowserConfig, BrowserEvent, EmbedError};
+pub use embed::{BrowserBuilder, BrowserConfig, BrowserEvent, EmbedError, is_browser_available};

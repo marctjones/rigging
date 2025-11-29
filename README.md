@@ -44,17 +44,41 @@ When upgrading Servo, only the internal `backend.rs` implementation needs change
 
 ## Transport Layer
 
-Rigging extends standard URLs with transport specifications:
+Rigging extends standard URLs with transport specifications.
+
+### Supported Transports
+
+| Transport | URL Syntax | Status | Platform | Description |
+|-----------|------------|--------|----------|-------------|
+| **TCP** | `http::tcp//host:port/` | ✅ Implemented | All | Standard TCP/IP (default) |
+| **Unix** | `http::unix///path.sock/` | ✅ Implemented | Linux, macOS | Unix Domain Sockets |
+| **Named Pipe** | `http::pipe//name/` | 🚧 Planned | Windows | Windows Named Pipes |
+| **Tor** | `http::tor//host/` | 🚧 Planned | All | Tor network via Corsair daemon |
+| **SSH** | `http::ssh//host/` | 📋 Future | All | SSH tunneling via `russh` |
+| **QUIC** | `http::quic//host/` | 📋 Future | All | QUIC/HTTP3 via `quinn` |
+
+### Transport URL Examples
 
 ```
 http::unix///tmp/app.sock/api/data    # Unix socket (absolute path)
 http::unix//var/run/app.sock          # Unix socket (relative path)
 http::tcp//localhost:8080             # Explicit TCP
-http::tor//example.onion              # Tor network
+http::tor//example.onion              # Tor hidden service
 http::pipe//myapp                     # Windows named pipe
+http::ssh//user@host:22/              # SSH tunnel (future)
+http::quic//host:443/                 # QUIC/HTTP3 (future)
 ```
 
-### Transport URL Example
+### Transport Chaining (Future)
+
+Rigging will support chaining transports for composed connections:
+
+```
+http::tor+unix///tmp/app.sock/        # Tor over Unix socket
+http::ssh+tcp//host/                  # SSH tunnel over TCP
+```
+
+### Transport URL Parsing Example
 
 ```rust
 use rigging::{TransportUrl, Transport};

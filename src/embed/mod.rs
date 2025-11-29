@@ -73,6 +73,8 @@ mod config;
 mod events;
 mod builder;
 mod backend;
+#[cfg(feature = "servo")]
+mod servo_backend;
 
 pub use config::BrowserConfig;
 pub use events::{BrowserEvent, NavigationEvent, LoadState};
@@ -102,10 +104,20 @@ pub enum EmbedError {
     ServoNotAvailable,
 }
 
-/// Check if the Servo browser engine is available
+/// Check if any browser engine is available
 ///
-/// Returns true if Rigging was compiled with Servo support.
+/// Returns true if Rigging was compiled with browser support (webview or servo).
 /// Applications should check this before attempting to create browser windows.
+pub fn is_browser_available() -> bool {
+    cfg!(any(feature = "webview", feature = "servo"))
+}
+
+/// Check if the webview backend is available
+pub fn is_webview_available() -> bool {
+    cfg!(feature = "webview")
+}
+
+/// Check if the Servo browser engine is available
 pub fn is_servo_available() -> bool {
     cfg!(feature = "servo")
 }
