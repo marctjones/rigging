@@ -4,6 +4,16 @@ This document provides instructions for AI coding assistants (Claude Code, Gemin
 
 **IMPORTANT**: Read this ENTIRE document before writing any code. Pay special attention to the "Common Mistakes to Avoid" section.
 
+## Before Starting Any Work
+
+**ALWAYS read `IMPLEMENTATION_PLAN.md` first** to understand:
+- Current project status (what's complete, what's in progress)
+- What phases are blocked and why
+- The specific next tasks to work on
+- Detailed step-by-step implementation plans
+
+The implementation plan has checkboxes showing exactly where we left off.
+
 ## Project Overview
 
 **Rigging is a fork of servoshell's core embedding code**, stripped of browser chrome, with a pluggable networking layer added.
