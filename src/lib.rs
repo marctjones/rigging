@@ -92,6 +92,10 @@ pub mod composed;
 // Embedding API module
 pub mod embed;
 
+// Servoshell embedding code (forked from servo/ports/servoshell)
+#[cfg(feature = "servo")]
+pub mod servoshell;
+
 // Transport layer re-exports
 pub use transport_url::TransportUrl;
 pub use types::{Transport, TransportChain, TransportError};
