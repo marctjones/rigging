@@ -13,13 +13,13 @@ use crossbeam_channel::{Receiver, Sender, unbounded};
 use euclid::Rect;
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use log::{error, info, warn};
-use servo::base::generic_channel::GenericSender;
-use servo::base::id::WebViewId;
-use servo::config::pref;
-use servo::ipc_channel::ipc::IpcSender;
-use servo::style_traits::CSSPixel;
-use servo::webrender_api::units::{DeviceIntPoint, DeviceIntSize};
-use servo::{
+use libservo::GenericSender;
+use libservo::WebViewId;
+use libservo::pref;
+use ipc_channel::ipc::IpcSender;
+use libservo::CSSPixel;
+use libservo::{DeviceIntPoint, DeviceIntSize};
+use libservo::{
     AllowOrDenyRequest, AuthenticationRequest, EmbedderControl, EmbedderControlId, EventLoopWaker,
     GamepadHapticEffectType, InputEvent, InputEventId, InputEventResult, JSValue, LoadStatus,
     MediaSessionEvent, PermissionRequest, ScreenshotCaptureError, Servo, ServoDelegate, ServoError,
@@ -28,10 +28,9 @@ use servo::{
 };
 use url::Url;
 
-use crate::GamepadSupport;
-use crate::prefs::ServoShellPreferences;
-use crate::webdriver::WebDriverEmbedderControls;
-use crate::window::{PlatformWindow, ServoShellWindow, ServoShellWindowId};
+// TODO: Re-enable these modules as they are ported from servoshell
+use crate::servoshell::stubs::{GamepadSupport, ServoShellPreferences, WebDriverEmbedderControls};
+use crate::servoshell::window::{PlatformWindow, ServoShellWindow, ServoShellWindowId};
 
 #[derive(Default)]
 pub struct WebViewCollection {

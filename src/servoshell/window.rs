@@ -6,17 +6,17 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use euclid::Scale;
-use servo::base::generic_channel::GenericSender;
-use servo::servo_geometry::{DeviceIndependentIntRect, DeviceIndependentPixel};
-use servo::webrender_api::units::{DeviceIntPoint, DeviceIntSize, DevicePixel};
-use servo::{
+use libservo::GenericSender;
+use libservo::{DeviceIndependentIntRect, DeviceIndependentPixel};
+use libservo::{DeviceIntPoint, DeviceIntSize, DevicePixel};
+use libservo::{
     AuthenticationRequest, Cursor, EmbedderControl, EmbedderControlId, InputEventId,
     InputEventResult, MediaSessionEvent, PermissionRequest, RenderingContext, ScreenGeometry,
     WebView, WebViewBuilder, WebViewId,
 };
 use url::Url;
 
-use crate::running_app_state::{RunningAppState, WebViewCollection};
+use crate::servoshell::running_app_state::{RunningAppState, WebViewCollection};
 
 // This should vary by zoom level and maybe actual text size (focused or under cursor)
 #[cfg_attr(any(target_os = "android", target_env = "ohos"), expect(dead_code))]
@@ -313,7 +313,7 @@ pub(crate) trait PlatformWindow {
         &self,
         _: Rc<RunningAppState>,
         _: &ServoShellWindow,
-        _: crate::desktop::event_loop::AppEvent,
+        _: crate::servoshell::desktop::event_loop::AppEvent,
     ) {
     }
     /// Request that the window redraw itself. It is up to the window to do this

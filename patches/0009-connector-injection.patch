@@ -1,8 +1,34 @@
 diff --git a/components/net/connector.rs b/components/net/connector.rs
-index 3adb53d8f69..cb18b2e950c 100644
+index 3adb53d8f69..032a150653e 100644
 --- a/components/net/connector.rs
 +++ b/components/net/connector.rs
-@@ -622,3 +622,39 @@ pub fn create_http_client(tls_config: TlsConfig) -> ServoClient {
+@@ -8,6 +8,7 @@ use std::sync::Arc;
+ use std::time::Duration;
+ use std::{fmt, io};
+ 
++use aws_lc_rs;
+ use futures::task::{Context, Poll};
+ use futures::{Future, TryFutureExt};
+ use http::uri::{Authority, Uri as Destination};
+@@ -25,7 +26,7 @@ use log::warn;
+ use parking_lot::Mutex;
+ use rustls::client::danger::ServerCertVerifier;
+ use rustls::client::{ClientConnection, EchStatus};
+-use rustls::crypto::{CryptoProvider, aws_lc_rs};
++use rustls::crypto::CryptoProvider;
+ use rustls::{ClientConfig, ProtocolVersion};
+ use rustls_pki_types::{CertificateDer, ServerName, UnixTime};
+ use servo_config::pref;
+@@ -429,7 +430,7 @@ impl CertificateVerificationOverrideVerifier {
+         let use_webpki_roots = cfg!(target_os = "android") || pref!(network_use_webpki_roots);
+         let main_verifier = if !use_webpki_roots {
+             let crypto_provider = CryptoProvider::get_default()
+-                .unwrap_or(&Arc::new(aws_lc_rs::default_provider()))
++                .expect("No default crypto provider installed")
+                 .clone();
+             let verifier = match ca_certficates {
+                 CACertificates::Default => rustls_platform_verifier::Verifier::new(crypto_provider),
+@@ -622,3 +623,39 @@ pub fn create_http_client(tls_config: TlsConfig) -> ServoClient {
          .http1_title_case_headers(true)
          .build(InstrumentedConnector::from(connector))
  }
@@ -26,7 +52,7 @@ index 3adb53d8f69..cb18b2e950c 100644
 +where
 +    C: Service<http::Uri> + Clone + Send + Sync + 'static,
 +    C::Response: hyper::rt::Read + hyper::rt::Write + Connection + Unpin + Send + 'static,
-+    C::Future: Send + 'static,
++    C::Future: Send + Unpin + 'static,
 +    C::Error: Into<BoxError>,
 +{
 +    let connector = custom_connector.unwrap_or_else(|| {
@@ -43,7 +69,7 @@ index 3adb53d8f69..cb18b2e950c 100644
 +        .build(connector)
 +}
 diff --git a/components/servo/servo.rs b/components/servo/servo.rs
-index 5d28b3d7e55..2d3e48cf7d3 100644
+index db80efba74c..d49caad6921 100644
 --- a/components/servo/servo.rs
 +++ b/components/servo/servo.rs
 @@ -1227,6 +1227,8 @@ pub struct ServoBuilder {
@@ -53,9 +79,9 @@ index 5d28b3d7e55..2d3e48cf7d3 100644
 +    /// Optional custom HTTP connector for transport-aware URLs
 +    custom_connector: Option<Box<dyn std::any::Any + Send>>,
  }
-
+ 
  impl Default for ServoBuilder {
-@@ -1237,6 +1239,7 @@ impl Default for ServoBuilder {
+@@ -1238,6 +1240,7 @@ impl Default for ServoBuilder {
              protocol_registry: Default::default(),
              #[cfg(feature = "webxr")]
              webxr_registry: Box::new(DefaultWebXrRegistry),
@@ -63,7 +89,7 @@ index 5d28b3d7e55..2d3e48cf7d3 100644
          }
      }
  }
-@@ -1273,6 +1276,29 @@ impl ServoBuilder {
+@@ -1272,6 +1275,29 @@ impl ServoBuilder {
          self.webxr_registry = webxr_registry;
          self
      }
@@ -91,5 +117,5 @@ index 5d28b3d7e55..2d3e48cf7d3 100644
 +        self
 +    }
  }
-
+ 
  fn register_system_memory_reporter_for_event_loop(

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use keyboard_types::{Code, Key, KeyState, Location, Modifiers, NamedKey};
-use servo::KeyboardEvent;
+use libservo::KeyboardEvent;
 use winit::event::{ElementState, KeyEvent};
 use winit::keyboard::{
     Key as WinitKey, KeyCode, KeyLocation as WinitKeyLocation, ModifiersState,

@@ -39,6 +39,7 @@ git pull
 4. **0002-unix-connector.patch** - Changed `tower_service::Service` to `tower::Service`
 5. **0008-tor-connector.patch** - Changed `tower_service::Service` to `tower::Service`
 6. **0010-connector-aws-lc-rs-fix.patch** - NEW: Fixes aws-lc-rs import issue
+7. **0009-connector-injection.patch** - Added `Unpin` bound to `C::Future` type constraint
 
 **Why patches needed updating:**
 - Servo's import structure changed (std::fmt imports moved)
