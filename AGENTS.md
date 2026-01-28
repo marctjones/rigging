@@ -1,6 +1,14 @@
-# AI Agent Development Guide for Rigging
+# Rigging - Claude Code Guide
 
-This document provides instructions for AI coding assistants (Claude Code, Gemini, Cursor, etc.) working on Rigging.
+**WORKSPACE NOTE**: Rigging is part of the `harbor-workspace`. For cross-project guidance, see `../CLAUDE.md` and `../.claude/rules/workspace.md`.
+
+## Quick Links
+
+- **Workspace Overview**: [../CLAUDE.md](../CLAUDE.md)
+- **Harbor (consumer)**: [../harbor/CLAUDE.md](../harbor/CLAUDE.md)
+- **Workspace Rules**: [../.claude/rules/workspace.md](../.claude/rules/workspace.md)
+
+---
 
 **IMPORTANT**: Read this ENTIRE document before writing any code. Pay special attention to the "Common Mistakes to Avoid" section.
 
@@ -231,6 +239,22 @@ https::tcp//example.com/             # Standard TCP (explicit)
 
 ## Common Commands
 
+**Workspace commands** (run from `harbor-workspace/`):
+```bash
+# Build Rigging
+cargo build -p rigging
+
+# Test Rigging
+cargo test -p rigging
+
+# Test entire workspace (Rigging + Harbor)
+cargo test
+
+# Verify Harbor still works after Rigging changes
+cargo test -p harbor
+```
+
+**Rigging-only commands** (run from `rigging/`):
 ```bash
 # Build
 cargo build
@@ -276,9 +300,36 @@ cargo check
 
 ### With Harbor (Local Apps)
 
+**Location**: `../harbor/` (workspace member)
+
+**Integration**:
 - Harbor depends on Rigging for browser embedding
 - Uses `BrowserBuilder` to create windows
 - URL format: `http::unix///tmp/app.sock/`
+- Uses UdsConnector exclusively (blocks TCP)
+
+**Testing Harbor After Rigging Changes**:
+```bash
+# From workspace root
+cargo test
+
+# Or specifically test Harbor
+cargo test -p harbor
+
+# Or run Harbor example
+cargo run -p harbor -- examples/hello-flask/app.toml
+```
+
+**Checking Harbor's Rigging Usage**:
+```bash
+# Search for Rigging usage in Harbor
+grep -r "rigging::" ../harbor/src/
+
+# Common patterns Harbor uses:
+# - rigging::Browser
+# - rigging::UdsConnector
+# - rigging::TransportUrl
+```
 
 ### With Compass (Browser)
 
