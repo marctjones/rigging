@@ -21,12 +21,28 @@ named-pipe = []
 # NOTE: This requires system dependencies (javascriptcoregtk-4.1 on Linux)
 # NOT RECOMMENDED - Use Servo instead for full control
 webview = ["wry", "tao"]
-# Enable Servo browser engine (launches pre-built servo binary as subprocess)
-# When enabled, BrowserBuilder::run() will launch servo to display web content
+# Enable Servo browser engine (embedded as library)
+# When enabled, Rigging embeds Servo directly and provides full control over rendering
 # This is the recommended backend for Harbor and Compass
-# Note: Requires servo binary to be built and available in PATH or at
-#       /home/marc/servo/target/release/servo
-servo = []
+# Note: Requires Servo source at /home/marc/servo (path dependency)
+servo = [
+    "dep:libservo",
+    "dep:net",
+    "dep:webdriver_server",
+    "dep:winit",
+    "dep:surfman",
+    "dep:euclid",
+    "dep:keyboard-types",
+    "dep:raw-window-handle",
+    "dep:crossbeam-channel",
+    "dep:dpi",
+    "dep:ipc-channel",
+    "dep:rustls",
+    "dep:headers",
+    "dep:gilrs",
+    "dep:glow",
+    "dep:mime_guess",
+]
 
 [dependencies]
 # URL parsing
@@ -56,8 +72,27 @@ bincode = { workspace = true }
 wry = { version = "0.53", optional = true }
 tao = { version = "0.33", optional = true }
 
-# Servo browser engine runs as subprocess - no library dependency needed
-# The servo binary must be pre-built and available
+# Servo browser engine - embedded as library (servo feature)
+# Uses path dependency to local Servo checkout
+# TODO: Make this portable (git dependency or published crates)
+libservo = { path = "/home/marc/servo/components/servo", optional = true, default-features = false }
+net = { path = "/home/marc/servo/components/net", optional = true }
+webdriver_server = { path = "/home/marc/servo/components/webdriver_server", optional = true }
+
+# Servo embedding dependencies (when servo feature enabled)
+winit = { version = "0.30", optional = true }
+surfman = { version = "0.9", optional = true, features = ["sm-raw-window-handle-06", "sm-x11"] }
+euclid = { version = "0.22", optional = true }
+keyboard-types = { version = "0.7", optional = true }
+raw-window-handle = { version = "0.6", optional = true }
+crossbeam-channel = { version = "0.5", optional = true }
+dpi = { version = "0.1", optional = true }
+ipc-channel = { version = "0.19", optional = true }
+rustls = { version = "0.23", optional = true, features = ["aws-lc-rs"] }
+headers = { version = "0.4", optional = true }
+gilrs = { version = "0.11", optional = true }  # Gamepad support
+glow = { version = "0.14", optional = true }
+mime_guess = { version = "2.0", optional = true }
 
 # Platform-specific
 [target.'cfg(unix)'.dependencies]
