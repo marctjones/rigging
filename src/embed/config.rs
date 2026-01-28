@@ -9,6 +9,11 @@
 
 use std::path::PathBuf;
 
+#[cfg(feature = "servo")]
+use crate::composed::ComposedConfig;
+#[cfg(feature = "servo")]
+use crate::types::Transport;
+
 /// Configuration for a browser window
 ///
 /// This struct is part of the **stable API**. Fields should not be removed,
@@ -59,6 +64,14 @@ pub struct BrowserConfig {
 
     /// Homepage URL (for new tabs, etc.)
     pub homepage: Option<String>,
+
+    /// Allowed transport types (None = allow all)
+    #[cfg(feature = "servo")]
+    pub allowed_transports: Option<Vec<Transport>>,
+
+    /// Connector configuration (for Servo backend with transport-aware URLs)
+    #[cfg(feature = "servo")]
+    pub connector_config: Option<ComposedConfig>,
 }
 
 impl Default for BrowserConfig {
@@ -79,6 +92,10 @@ impl Default for BrowserConfig {
             headless: false,
             screenshot_path: None,
             homepage: None,
+            #[cfg(feature = "servo")]
+            allowed_transports: None,
+            #[cfg(feature = "servo")]
+            connector_config: None,
         }
     }
 }
@@ -169,6 +186,27 @@ impl BrowserConfig {
     /// Set homepage URL
     pub fn with_homepage(mut self, url: impl Into<String>) -> Self {
         self.homepage = Some(url.into());
+        self
+    }
+
+    /// Restrict to specific transports (Servo backend only)
+    #[cfg(feature = "servo")]
+    pub fn with_transport_restriction(mut self, transports: Vec<Transport>) -> Self {
+        self.allowed_transports = Some(transports);
+        self
+    }
+
+    /// Restrict to Unix sockets only (Servo backend only)
+    #[cfg(feature = "servo")]
+    pub fn unix_only(mut self) -> Self {
+        self.allowed_transports = Some(vec![Transport::Unix]);
+        self
+    }
+
+    /// Set connector configuration (Servo backend only)
+    #[cfg(feature = "servo")]
+    pub fn with_connector_config(mut self, config: ComposedConfig) -> Self {
+        self.connector_config = Some(config);
         self
     }
 }

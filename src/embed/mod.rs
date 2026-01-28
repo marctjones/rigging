@@ -56,6 +56,8 @@
 //!
 //! # Example Usage
 //!
+//! ## Basic Usage
+//!
 //! ```rust,ignore
 //! use rigging::embed::{BrowserBuilder, BrowserConfig};
 //!
@@ -66,6 +68,27 @@
 //! BrowserBuilder::new()
 //!     .config(config)
 //!     .on_event(|event| println!("Event: {:?}", event))
+//!     .run()?;
+//! ```
+//!
+//! ## Transport-Aware Usage (Servo backend only)
+//!
+//! ```rust,ignore
+//! use rigging::embed::{BrowserBuilder, BrowserConfig, Transport, ComposedConfig};
+//! use std::path::PathBuf;
+//!
+//! // Create config with Unix socket only restriction
+//! let config = BrowserConfig::new("http::unix///tmp/app.sock/")
+//!     .with_title("Harbor App")
+//!     .with_size(1200, 800)
+//!     .unix_only()  // Restricts to Unix sockets only
+//!     .with_connector_config(ComposedConfig {
+//!         socket_dir: Some(PathBuf::from("/tmp")),
+//!         tor_socket: None,  // Disable Tor
+//!     });
+//!
+//! BrowserBuilder::new()
+//!     .config(config)
 //!     .run()?;
 //! ```
 
@@ -79,6 +102,12 @@ mod servo_backend;
 pub use config::BrowserConfig;
 pub use events::{BrowserEvent, NavigationEvent, LoadState};
 pub use builder::BrowserBuilder;
+
+// Re-export transport types for convenience (servo feature only)
+#[cfg(feature = "servo")]
+pub use crate::types::Transport;
+#[cfg(feature = "servo")]
+pub use crate::composed::ComposedConfig;
 
 use thiserror::Error;
 

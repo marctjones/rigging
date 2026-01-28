@@ -17,7 +17,7 @@
 use super::config::BrowserConfig;
 use super::events::{BrowserEvent, EventCallback};
 use super::EmbedError;
-use log::{debug, info, warn};
+use log::{info, warn};
 
 /// Run the browser with the given configuration
 ///
@@ -41,8 +41,14 @@ pub fn run_browser(
     debug!("Window: {}x{}", config.width, config.height);
     debug!("URL: {}", config.url);
 
-    // Convert transport URL to standard URL for webview
-    let url = convert_transport_url(&config.url)?;
+    // Check for transport-aware URLs - webview backend does not support them
+    if config.url.contains("::unix//") || config.url.contains("::tor//") || config.url.contains("::pipe//") {
+        return Err(EmbedError::InvalidUrl(
+            format!("WebView backend does not support transport-aware URLs (found: {}). Use Servo backend with 'servo' feature.", config.url)
+        ));
+    }
+
+    let url = &config.url;
     info!("Loading URL: {}", url);
 
     // Create event loop
@@ -65,7 +71,7 @@ pub fn run_browser(
 
     // Build webview
     let _webview = WebViewBuilder::new()
-        .with_url(&url)
+        .with_url(url)
         .with_devtools(config.devtools)
         .build(&window)
         .map_err(|e| EmbedError::InitFailed(e.to_string()))?;
@@ -76,7 +82,7 @@ pub fn run_browser(
     emit_event(
         &event_callback,
         BrowserEvent::LoadStarted {
-            url: url.clone(),
+            url: url.to_string(),
         },
     );
 
@@ -128,73 +134,6 @@ pub fn run_browser(
     Err(EmbedError::ServoNotAvailable)
 }
 
-/// Convert transport-aware URL to standard URL for webview
-///
-/// Transport URLs like `http::unix///tmp/app.sock/` need to be converted
-/// to standard HTTP URLs that the webview can understand.
-///
-/// For Unix socket URLs, we start a local proxy server that forwards
-/// requests to the socket. For now, we just convert to localhost.
-fn convert_transport_url(url: &str) -> Result<String, EmbedError> {
-    if url.is_empty() {
-        return Err(EmbedError::InvalidUrl("URL cannot be empty".into()));
-    }
-
-    // Handle transport-aware URLs
-    if url.starts_with("http::unix//") {
-        // Unix socket URL - extract socket path and URL path
-        // Format: http::unix///path/to/socket.sock/url/path
-        let rest = &url["http::unix//".len()..];
-
-        // For now, Unix socket URLs need a proxy.
-        // Check if it starts with localhost (already converted) or needs conversion
-        if rest.starts_with("/") {
-            // Absolute socket path - we need to proxy this
-            // For the demo, assume a proxy is running on localhost:9999
-            // In production, we'd start a proxy automatically
-            warn!("Unix socket URL detected: {}", url);
-            warn!("Note: System webview cannot directly access Unix sockets");
-            warn!("Starting local proxy would be needed for production use");
-
-            // Extract the URL path after the socket
-            let socket_and_path = &rest[1..]; // Remove leading /
-            if let Some(sock_end) = socket_and_path.find(".sock") {
-                let after_sock = &socket_and_path[sock_end + 5..];
-                let path = if after_sock.is_empty() { "/" } else { after_sock };
-                // Return localhost URL - assumes proxy is running
-                return Ok(format!("http://localhost:5000{}", path));
-            }
-        }
-
-        // Fallback - just use localhost
-        Ok("http://localhost:5000/".to_string())
-    } else if url.starts_with("http::tcp//") {
-        // Explicit TCP - convert to standard URL
-        let rest = &url["http::tcp//".len()..];
-        Ok(format!("http://{}", rest))
-    } else if url.starts_with("https::tcp//") {
-        let rest = &url["https::tcp//".len()..];
-        Ok(format!("https://{}", rest))
-    } else if url.starts_with("http://") || url.starts_with("https://") {
-        // Already standard URL
-        Ok(url.to_string())
-    } else if url.starts_with("about:") {
-        // about: URLs - convert to data URL or blank
-        if url == "about:blank" {
-            Ok("about:blank".to_string())
-        } else {
-            Ok("about:blank".to_string())
-        }
-    } else if url.starts_with("file://") {
-        // File URLs pass through
-        Ok(url.to_string())
-    } else {
-        // Unknown scheme - try to use as-is
-        warn!("Unknown URL scheme: {}", url);
-        Ok(url.to_string())
-    }
-}
-
 /// Helper to emit events if a callback is registered
 fn emit_event(callback: &Option<EventCallback>, event: BrowserEvent) {
     if let Some(ref cb) = callback {
@@ -202,30 +141,3 @@ fn emit_event(callback: &Option<EventCallback>, event: BrowserEvent) {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_convert_transport_url_empty() {
-        assert!(convert_transport_url("").is_err());
-    }
-
-    #[test]
-    fn test_convert_transport_url_http() {
-        let result = convert_transport_url("http://localhost/").unwrap();
-        assert_eq!(result, "http://localhost/");
-    }
-
-    #[test]
-    fn test_convert_transport_url_explicit_tcp() {
-        let result = convert_transport_url("http::tcp//localhost:8080/").unwrap();
-        assert_eq!(result, "http://localhost:8080/");
-    }
-
-    #[test]
-    fn test_convert_transport_url_about() {
-        let result = convert_transport_url("about:blank").unwrap();
-        assert_eq!(result, "about:blank");
-    }
-}
