@@ -173,10 +173,11 @@ println!("Socket: {:?}", url.unix_socket_path());
 - See [PATCHES_STATUS.md](./PATCHES_STATUS.md) for details
 
 **Phase 2 (Issues #45, #49-51): 🚧 IN PROGRESS**
-- Servoshell embedding code imported (src/servoshell/)
-- All imports updated to use libservo::
-- Connector injection foundation laid
-- Next: Integrate ComposedConnector into servoshell/desktop/app.rs
+- ✅ Servoshell embedding code imported (src/servoshell/)
+- ✅ Import visibility issue solved (servo:: not libservo::)
+- ✅ All dependencies loading correctly
+- 🚧 Updating servoshell to current Servo API
+- Next: Stub out API mismatches, test window creation
 
 ## Servo Patches
 
