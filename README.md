@@ -164,20 +164,38 @@ println!("Transport: {:?}", url.transport());
 println!("Socket: {:?}", url.unix_socket_path());
 ```
 
-## Patch Contents
+## Current Status
 
-Rigging also provides patches for adding transport support to Servo:
+**Phase 1 (Issue #48): ✅ COMPLETE**
+- All 9 Servo patches apply cleanly to current Servo main (commit c0583492d60, Jan 27 2026)
+- ServoBuilder::with_connector() API implemented
+- Patched Servo compiles successfully
+- See [PATCHES_STATUS.md](./PATCHES_STATUS.md) for details
 
-| Patch | Description |
-|-------|-------------|
-| `0001-transport-url.patch` | TransportUrl parsing with scheme::transport syntax |
-| `0002-unix-connector.patch` | Unix Domain Socket connector for hyper |
-| `0003-transport-types.patch` | Transport enum and TransportChain types |
-| `0004-http-loader.patch` | HTTP dispatch modifications for multi-transport |
-| `0005-net-lib.patch` | Module exports for transport code |
-| `0006-net-cargo.patch` | Dependencies (hyperlocal, etc.) |
-| `0007-shared-net-lib.patch` | Shared transport type exports |
-| `0008-tor-connector.patch` | Tor connector via Corsair IPC |
+**Phase 2 (Issues #45, #49-51): 🚧 IN PROGRESS**
+- Servoshell embedding code imported (src/servoshell/)
+- All imports updated to use libservo::
+- Connector injection foundation laid
+- Next: Integrate ComposedConnector into servoshell/desktop/app.rs
+
+## Servo Patches
+
+Rigging provides patches for adding transport support to Servo:
+
+| Patch | Description | Status |
+|-------|-------------|--------|
+| `0001-transport-url.patch` | TransportUrl parsing with scheme::transport syntax | ✅ Applies |
+| `0002-unix-connector.patch` | Unix Domain Socket connector for hyper | ✅ Applies |
+| `0003-transport-types.patch` | Transport enum and TransportChain types | ✅ Applies |
+| `0005-net-lib.patch` | Module exports for transport code | ✅ Applies |
+| `0006-net-cargo.patch` | Dependencies (tokio-socks, hyperlocal, aws-lc-rs) | ✅ Applies |
+| `0007-shared-net-lib.patch` | Shared transport type exports | ✅ Applies |
+| `0008-tor-connector.patch` | Tor connector via Corsair IPC | ✅ Applies |
+| `0009-connector-injection.patch` | ServoBuilder::with_connector() API + Unpin fix | ✅ Applies |
+| `0010-connector-aws-lc-rs-fix.patch` | Fix aws-lc-rs import structure | ✅ Applies |
+| `0004-http-loader.patch` | HTTP dispatch modifications | ⏸️ Optional (deferred) |
+
+**All patches target Servo main branch** (commit c0583492d60, Jan 27 2026)
 
 ## Related Projects
 
