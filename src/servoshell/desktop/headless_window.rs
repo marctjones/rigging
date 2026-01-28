@@ -11,15 +11,15 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use euclid::{Point2D, Scale, Size2D};
-use libservo::servo_geometry::{
+use libservo::{
     DeviceIndependentIntRect, DeviceIndependentPixel, convert_rect_to_css_pixel,
 };
-use libservo::webrender_api::units::{DeviceIntPoint, DeviceIntRect, DeviceIntSize, DevicePixel};
+use libservo::{DeviceIntPoint, DeviceIntRect, DeviceIntSize, DevicePixel};
 use libservo::{RenderingContext, ScreenGeometry, SoftwareRenderingContext, WebView};
 use winit::dpi::PhysicalSize;
 
-use crate::prefs::ServoShellPreferences;
-use crate::window::{MIN_WINDOW_INNER_SIZE, PlatformWindow, ServoShellWindow, ServoShellWindowId};
+use crate::servoshell::stubs::ServoShellPreferences;
+use crate::servoshell::window::{MIN_WINDOW_INNER_SIZE, PlatformWindow, ServoShellWindow, ServoShellWindowId};
 
 pub struct Window {
     fullscreen: Cell<bool>,

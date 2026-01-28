@@ -9,11 +9,11 @@ use std::rc::Rc;
 use std::time::Instant;
 use std::{env, fs};
 
-use net::protocols::ProtocolRegistry;
-use libservo::config::opts::Opts;
-use libservo::config::prefs::Preferences;
-use libservo::servo_url::ServoUrl;
-use libservo::user_content_manager::{UserContentManager, UserScript};
+use libservo::protocol_handler::ProtocolRegistry;
+use libservo::Opts;
+use libservo::Preferences;
+use libservo::ServoUrl;
+use libservo::{UserContentManager, UserScript};
 use libservo::{EventLoopWaker, ServoBuilder};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -25,10 +25,10 @@ use super::{headed_window, headless_window};
 use crate::servoshell::desktop::event_loop::ServoShellEventLoop;
 use crate::servoshell::desktop::protocols;
 use crate::servoshell::desktop::tracing::trace_winit_event;
-use crate::parser::get_default_url;
-use crate::prefs::ServoShellPreferences;
-use crate::running_app_state::RunningAppState;
-use crate::window::PlatformWindow;
+use crate::servoshell::parser::get_default_url;
+use crate::servoshell::stubs::ServoShellPreferences;
+use crate::servoshell::running_app_state::RunningAppState;
+use crate::servoshell::window::PlatformWindow;
 
 pub(crate) enum AppState {
     Initializing,
@@ -176,7 +176,7 @@ impl ApplicationHandler<AppEvent> for App {
         window_event: WindowEvent,
     ) {
         let now = Instant::now();
-        trace_winit_event!(
+        trace_winit_event(
             window_event,
             "@{:?} (+{:?}) {window_event:?}",
             now - self.t_start,

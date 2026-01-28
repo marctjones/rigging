@@ -9,3 +9,5 @@ pub mod event_loop;
 pub mod keyutils;
 pub mod headless_window;
 pub mod headed_window;
+pub mod protocols;
+pub mod tracing;
