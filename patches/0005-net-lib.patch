@@ -1,11 +1,11 @@
 diff --git a/components/net/lib.rs b/components/net/lib.rs
-index e531021faf5..5522f7647b6 100644
+index cc013f0a3c3..3c6e0eaf857 100644
 --- a/components/net/lib.rs
 +++ b/components/net/lib.rs
-@@ -20,6 +20,9 @@ pub mod protocols;
- pub mod request_interceptor;
- pub mod resource_thread;
+@@ -23,6 +23,9 @@ pub mod resource_thread;
  pub mod subresource_integrity;
+ #[cfg(feature = "test-util")]
+ pub mod test_util;
 +pub mod tor_connector;
 +pub mod transport_url;
 +pub mod unix_connector;

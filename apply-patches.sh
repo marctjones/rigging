@@ -56,11 +56,12 @@ PATCHES=(
     "0003-transport-types.patch"      # Transport enum and types (shared/net)
     "0007-shared-net-lib.patch"       # Export transport types
     "0006-net-cargo.patch"            # Add dependencies
+    "0010-connector-aws-lc-rs-fix.patch" # Fix aws-lc-rs import in connector.rs
     "0005-net-lib.patch"              # Module exports
     "0001-transport-url.patch"        # TransportUrl parsing
     "0002-unix-connector.patch"       # Unix socket connector
     "0008-tor-connector.patch"        # Tor connector
-    "0004-http-loader.patch"          # HTTP dispatch modifications
+    "0004-http-loader.patch"          # HTTP dispatch modifications (optional)
     "0009-connector-injection.patch"  # Custom connector injection for Rigging
 )
 

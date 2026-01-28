@@ -1,6 +1,6 @@
 diff --git a/components/net/unix_connector.rs b/components/net/unix_connector.rs
 new file mode 100644
-index 00000000000..eba505ccc2b
+index 00000000000..d692b6c332e
 --- /dev/null
 +++ b/components/net/unix_connector.rs
 @@ -0,0 +1,223 @@
@@ -18,7 +18,7 @@ index 00000000000..eba505ccc2b
 +use http::uri::Uri;
 +use hyperlocal::UnixConnector as HyperlocalConnector;
 +use log::{debug, warn};
-+use tower_service::Service;
++use tower::Service;
 +
 +/// Validates a socket path for security concerns
 +///

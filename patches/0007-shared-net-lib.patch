@@ -1,5 +1,5 @@
 diff --git a/components/shared/net/lib.rs b/components/shared/net/lib.rs
-index e93a1e1b48a..a54c5d15b13 100644
+index fb0c776dc94..9a3b4dfe9a7 100644
 --- a/components/shared/net/lib.rs
 +++ b/components/shared/net/lib.rs
 @@ -4,6 +4,8 @@
@@ -8,47 +8,6 @@ index e93a1e1b48a..a54c5d15b13 100644
  
 +pub mod transport;
 +
- use std::fmt::Display;
+ use std::fmt::{self, Debug, Display};
  use std::sync::{LazyLock, OnceLock};
  use std::thread::{self, JoinHandle};
-@@ -272,12 +274,12 @@ impl std::fmt::Debug for DebugVec {
- impl FetchResponseMsg {
-     pub fn request_id(&self) -> RequestId {
-         match self {
--            FetchResponseMsg::ProcessRequestBody(id) |
--            FetchResponseMsg::ProcessRequestEOF(id) |
--            FetchResponseMsg::ProcessResponse(id, ..) |
--            FetchResponseMsg::ProcessResponseChunk(id, ..) |
--            FetchResponseMsg::ProcessResponseEOF(id, ..) |
--            FetchResponseMsg::ProcessCspViolations(id, ..) => *id,
-+            FetchResponseMsg::ProcessRequestBody(id)
-+            | FetchResponseMsg::ProcessRequestEOF(id)
-+            | FetchResponseMsg::ProcessResponse(id, ..)
-+            | FetchResponseMsg::ProcessResponseChunk(id, ..)
-+            | FetchResponseMsg::ProcessResponseEOF(id, ..)
-+            | FetchResponseMsg::ProcessCspViolations(id, ..) => *id,
-         }
-     }
- }
-@@ -364,7 +366,7 @@ impl FetchTaskTarget for IpcSender<FetchResponseMsg> {
-         let payload = if let Some(network_error) = response.get_network_error() {
-             Err(network_error.clone())
-         } else {
--            Ok(response.get_resource_timing().lock().clone())
-+            Ok(response.get_resource_timing().lock().unwrap().clone())
-         };
- 
-         let _ = self.send(FetchResponseMsg::ProcessResponseEOF(request.id, payload));
-@@ -798,9 +800,9 @@ impl ResourceFetchTiming {
-     pub fn set_attribute(&mut self, attribute: ResourceAttribute) {
-         let should_attribute_always_be_updated = matches!(
-             attribute,
--            ResourceAttribute::FetchStart |
--                ResourceAttribute::ResponseEnd |
--                ResourceAttribute::StartTime(_)
-+            ResourceAttribute::FetchStart
-+                | ResourceAttribute::ResponseEnd
-+                | ResourceAttribute::StartTime(_)
-         );
-         if !self.timing_check_passed && !should_attribute_always_be_updated {
-             return;

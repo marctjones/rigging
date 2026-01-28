@@ -1,0 +1,30 @@
+diff --git a/components/net/connector.rs b/components/net/connector.rs
+index 3adb53d8f69..ade69fdce72 100644
+--- a/components/net/connector.rs
++++ b/components/net/connector.rs
+@@ -8,6 +8,7 @@ use std::sync::Arc;
+ use std::time::Duration;
+ use std::{fmt, io};
+ 
++use aws_lc_rs;
+ use futures::task::{Context, Poll};
+ use futures::{Future, TryFutureExt};
+ use http::uri::{Authority, Uri as Destination};
+@@ -25,7 +26,7 @@ use log::warn;
+ use parking_lot::Mutex;
+ use rustls::client::danger::ServerCertVerifier;
+ use rustls::client::{ClientConnection, EchStatus};
+-use rustls::crypto::{CryptoProvider, aws_lc_rs};
++use rustls::crypto::CryptoProvider;
+ use rustls::{ClientConfig, ProtocolVersion};
+ use rustls_pki_types::{CertificateDer, ServerName, UnixTime};
+ use servo_config::pref;
+@@ -429,7 +430,7 @@ impl CertificateVerificationOverrideVerifier {
+         let use_webpki_roots = cfg!(target_os = "android") || pref!(network_use_webpki_roots);
+         let main_verifier = if !use_webpki_roots {
+             let crypto_provider = CryptoProvider::get_default()
+-                .unwrap_or(&Arc::new(aws_lc_rs::default_provider()))
++                .expect("No default crypto provider installed")
+                 .clone();
+             let verifier = match ca_certficates {
+                 CACertificates::Default => rustls_platform_verifier::Verifier::new(crypto_provider),

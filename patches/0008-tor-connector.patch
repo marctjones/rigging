@@ -1,6 +1,6 @@
 diff --git a/components/net/tor_connector.rs b/components/net/tor_connector.rs
 new file mode 100644
-index 00000000000..5853835626a
+index 00000000000..8ea8eea03dc
 --- /dev/null
 +++ b/components/net/tor_connector.rs
 @@ -0,0 +1,347 @@
@@ -30,7 +30,7 @@ index 00000000000..5853835626a
 +use tokio::net::TcpStream;
 +use tokio::sync::RwLock;
 +use tokio_socks::tcp::Socks5Stream;
-+use tower_service::Service;
++use tower::Service;
 +
 +/// Default Tor SOCKS5 proxy address (standard Tor daemon port)
 +pub const DEFAULT_TOR_SOCKS_ADDR: &str = "127.0.0.1:9050";
