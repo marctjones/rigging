@@ -1,33 +1,12 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: Rigging <noreply@rigging.dev>
-Date: Mon, 27 Jan 2026 00:00:00 +0000
-Subject: [PATCH] Add custom connector injection to Servo
-
-Adds ServoBuilder::with_connector() method to allow applications to inject
-custom HTTP connectors. This enables transport-aware URLs (Unix sockets,
-Tor, etc.) without modifying Servo's default networking behavior.
-
-Changes:
-- Add create_http_client_with_connector() to net/connector.rs
-- Add with_connector() method to ServoBuilder
-- Pass custom connector through to resource thread
-- Maintain backwards compatibility (connector is optional)
-
-This allows Rigging to inject ComposedConnector for transport-aware URLs.
----
- components/net/connector.rs        | 33 +++++++++++++++++++++++++++++++
- components/net/resource_thread.rs  |  9 ++++++++-
- components/servo/lib.rs            | 20 ++++++++++++++++++-
- 3 files changed, 60 insertions(+), 2 deletions(-)
-
 diff --git a/components/net/connector.rs b/components/net/connector.rs
-index 1111111111..2222222222 100644
+index 3adb53d8f69..cb18b2e950c 100644
 --- a/components/net/connector.rs
 +++ b/components/net/connector.rs
-@@ -610,6 +610,39 @@ impl<C> Connection for InstrumentedConnection<C>
-     }
+@@ -622,3 +622,39 @@ pub fn create_http_client(tls_config: TlsConfig) -> ServoClient {
+         .http1_title_case_headers(true)
+         .build(InstrumentedConnector::from(connector))
  }
-
++
 +/// Create HTTP client with optional custom connector
 +///
 +/// This function allows applications (via Rigging) to inject a custom connector
@@ -43,7 +22,7 @@ index 1111111111..2222222222 100644
 +pub fn create_http_client_with_connector<C>(
 +    tls_config: TlsConfig,
 +    custom_connector: Option<C>,
-+) -> Client<InstrumentedConnector<C>, BoxedBody>
++) -> Client<C, BoxedBody>
 +where
 +    C: Service<http::Uri> + Clone + Send + Sync + 'static,
 +    C::Response: hyper::rt::Read + hyper::rt::Write + Connection + Unpin + Send + 'static,
@@ -59,62 +38,33 @@ index 1111111111..2222222222 100644
 +            .wrap_connector(ProxyConnector::new())
 +    });
 +
-+    Client::builder(TokioExecutor {}).build(InstrumentedConnector::from(connector))
++    Client::builder(TokioExecutor {})
++        .http1_title_case_headers(true)
++        .build(connector)
 +}
-+
- /// Create an HTTP client for use in networking
- ///
- /// This function configures:
-diff --git a/components/net/resource_thread.rs b/components/net/resource_thread.rs
-index 3333333333..4444444444 100644
---- a/components/net/resource_thread.rs
-+++ b/components/net/resource_thread.rs
-@@ -205,6 +205,7 @@ pub struct CoreResourceThread {
-
- /// The optional resources required by the CoreResourceThread
- pub struct CoreResourceThreadOptions {
-+    pub custom_connector: Option<Box<dyn std::any::Any + Send>>,
-     pub certificate_path: Option<String>,
- }
-
-@@ -220,7 +221,13 @@ impl CoreResourceThread {
-             )
-             .unwrap_or_else(TlsConfig::client_default);
-
--        let client = create_http_client(tls_config);
-+        let client = if let Some(connector) = options.custom_connector {
-+            // Custom connector provided (e.g., from Rigging)
-+            // Note: Type-erased via Box<dyn Any>, actual usage requires downcast
-+            create_http_client(tls_config)  // For now, use default until connector trait is stabilized
-+        } else {
-+            create_http_client(tls_config)
-+        };
-
-         let mut channel_manager = ResourceChannelManager::new(user_agent, devtools_chan);
-
-diff --git a/components/servo/lib.rs b/components/servo/lib.rs
-index 5555555555..6666666666 100644
---- a/components/servo/lib.rs
-+++ b/components/servo/lib.rs
-@@ -85,6 +85,8 @@ pub struct ServoBuilder {
-     servo_version: ServoVersion,
-     /// User content manager
-     user_content_manager: UserContentManager,
-+    /// Optional custom connector for transport-aware URLs
+diff --git a/components/servo/servo.rs b/components/servo/servo.rs
+index 5d28b3d7e55..2d3e48cf7d3 100644
+--- a/components/servo/servo.rs
++++ b/components/servo/servo.rs
+@@ -1227,6 +1227,8 @@ pub struct ServoBuilder {
+     protocol_registry: ProtocolRegistry,
+     #[cfg(feature = "webxr")]
+     webxr_registry: Box<dyn webxr::WebXrRegistry>,
++    /// Optional custom HTTP connector for transport-aware URLs
 +    custom_connector: Option<Box<dyn std::any::Any + Send>>,
  }
 
  impl Default for ServoBuilder {
-@@ -111,6 +113,7 @@ impl Default for ServoBuilder {
-             servo_version: ServoVersion::from_cargo(),
-             user_content_manager: UserContentManager::new(),
-             protocol_registry: ProtocolRegistry::default(),
+@@ -1237,6 +1239,7 @@ impl Default for ServoBuilder {
+             protocol_registry: Default::default(),
+             #[cfg(feature = "webxr")]
+             webxr_registry: Box::new(DefaultWebXrRegistry),
 +            custom_connector: None,
          }
      }
  }
-@@ -120,6 +123,20 @@ impl ServoBuilder {
-         self.opts = opts;
+@@ -1273,6 +1276,29 @@ impl ServoBuilder {
+         self.webxr_registry = webxr_registry;
          self
      }
 +
@@ -125,6 +75,14 @@ index 5555555555..6666666666 100644
 +    ///
 +    /// # Arguments
 +    /// * `connector` - Custom connector implementing tower::Service<Uri>
++    ///
++    /// # Example
++    /// ```ignore
++    /// let connector = ComposedConnector::new(config);
++    /// let servo = ServoBuilder::default()
++    ///     .with_connector(connector)
++    ///     .build();
++    /// ```
 +    pub fn with_connector<C>(mut self, connector: C) -> Self
 +    where
 +        C: Send + 'static,
@@ -132,18 +90,6 @@ index 5555555555..6666666666 100644
 +        self.custom_connector = Some(Box::new(connector));
 +        self
 +    }
+ }
 
-     /// Set Servo preferences
-     pub fn preferences(mut self, prefs: Preferences) -> Self {
-@@ -234,7 +251,8 @@ impl ServoBuilder {
-             protocol_registry: self.protocol_registry,
-             event_loop_waker: self.event_loop_waker,
-         };
--        let resource_threads = CoreResourceThread::new(self.opts.user_agent.clone(), None);
-+        let resource_options = net::resource_thread::CoreResourceThreadOptions { custom_connector: self.custom_connector };
-+        let resource_threads = CoreResourceThread::new(self.opts.user_agent.clone(), Some(resource_options));
-
-         let compositor = self.compositor.take();
-
---
-2.43.0
+ fn register_system_memory_reporter_for_event_loop(
