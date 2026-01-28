@@ -75,7 +75,7 @@ tao = { version = "0.33", optional = true }
 # Servo browser engine - embedded as library (servo feature)
 # Uses path dependency to local Servo checkout
 # TODO: Make this portable (git dependency or published crates)
-libservo = { path = "/home/marc/servo/components/servo", optional = true, default-features = false }
+libservo = { path = "/home/marc/servo/components/servo", optional = true }
 net = { path = "/home/marc/servo/components/net", optional = true }
 webdriver_server = { path = "/home/marc/servo/components/webdriver_server", optional = true }
 
