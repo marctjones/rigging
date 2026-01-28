@@ -4,7 +4,7 @@
 
 //! Stub for URL parsing (TODO: port from servoshell)
 
-use libservo::ServoUrl;
+use servo::ServoUrl;
 
 /// Get default URL (stub implementation)
 pub fn get_default_url() -> ServoUrl {

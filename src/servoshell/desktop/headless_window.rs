@@ -11,11 +11,11 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use euclid::{Point2D, Scale, Size2D};
-use libservo::{
+use servo::{
     DeviceIndependentIntRect, DeviceIndependentPixel, convert_rect_to_css_pixel,
 };
-use libservo::{DeviceIntPoint, DeviceIntRect, DeviceIntSize, DevicePixel};
-use libservo::{RenderingContext, ScreenGeometry, SoftwareRenderingContext, WebView};
+use servo::{DeviceIntPoint, DeviceIntRect, DeviceIntSize, DevicePixel};
+use servo::{RenderingContext, ScreenGeometry, SoftwareRenderingContext, WebView};
 use winit::dpi::PhysicalSize;
 
 use crate::servoshell::stubs::ServoShellPreferences;

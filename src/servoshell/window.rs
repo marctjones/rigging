@@ -6,10 +6,10 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use euclid::Scale;
-use libservo::GenericSender;
-use libservo::{DeviceIndependentIntRect, DeviceIndependentPixel};
-use libservo::{DeviceIntPoint, DeviceIntSize, DevicePixel};
-use libservo::{
+use servo::GenericSender;
+use servo::{DeviceIndependentIntRect, DeviceIndependentPixel};
+use servo::{DeviceIntPoint, DeviceIntSize, DevicePixel};
+use servo::{
     AuthenticationRequest, Cursor, EmbedderControl, EmbedderControlId, InputEventId,
     InputEventResult, MediaSessionEvent, PermissionRequest, RenderingContext, ScreenGeometry,
     WebView, WebViewBuilder, WebViewId,

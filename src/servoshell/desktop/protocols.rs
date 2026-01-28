@@ -4,12 +4,12 @@
 
 //! Stub for protocol registration (TODO: port from servoshell)
 
-use libservo::protocol_handler::ProtocolRegistry;
+use servo::protocol_handler::ProtocolRegistry;
 
 // TODO: Port these protocol handlers from servoshell
 
 pub mod urlinfo {
-    use libservo::protocol_handler::ProtocolHandler;
+    use servo::protocol_handler::ProtocolHandler;
 
     #[derive(Default)]
     pub struct UrlInfoProtocolHander;
@@ -20,7 +20,7 @@ pub mod urlinfo {
 }
 
 pub mod servo {
-    use libservo::protocol_handler::ProtocolHandler;
+    use servo::protocol_handler::ProtocolHandler;
 
     #[derive(Default)]
     pub struct ServoProtocolHandler;
@@ -31,7 +31,7 @@ pub mod servo {
 }
 
 pub mod resource {
-    use libservo::protocol_handler::ProtocolHandler;
+    use servo::protocol_handler::ProtocolHandler;
 
     #[derive(Default)]
     pub struct ResourceProtocolHandler;

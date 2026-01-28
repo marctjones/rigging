@@ -8,7 +8,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time;
 
 use log::warn;
-use libservo::EventLoopWaker;
+use servo::EventLoopWaker;
 use winit::event_loop::{EventLoop, EventLoop as WinitEventLoop, EventLoopProxy};
 use winit::window::WindowId;
 

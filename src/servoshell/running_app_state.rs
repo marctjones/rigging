@@ -13,15 +13,16 @@ use crossbeam_channel::{Receiver, Sender, unbounded};
 use euclid::Rect;
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use log::{error, info, warn};
-use libservo::GenericSender;
-use libservo::WebViewId;
-use libservo::pref;
+use servo::GenericSender;
+use servo::WebViewId;
+use servo::pref;
 use ipc_channel::ipc::IpcSender;
-use libservo::CSSPixel;
-use libservo::{DeviceIntPoint, DeviceIntSize};
-use libservo::{
+use servo::CSSPixel;
+use servo::{DeviceIntPoint, DeviceIntSize};
+use servo::{
     AllowOrDenyRequest, AuthenticationRequest, EmbedderControl, EmbedderControlId, EventLoopWaker,
-    GamepadHapticEffectType, InputEvent, InputEventId, InputEventResult, JSValue, LoadStatus,
+    // GamepadHapticEffectType not exported in current Servo
+    InputEvent, InputEventId, InputEventResult, JSValue, LoadStatus,
     MediaSessionEvent, PermissionRequest, ScreenshotCaptureError, Servo, ServoDelegate, ServoError,
     TraversalId, WebDriverCommandMsg, WebDriverJSResult, WebDriverLoadStatus,
     WebDriverScriptCommand, WebDriverSenders, WebView, WebViewBuilder, WebViewDelegate,
