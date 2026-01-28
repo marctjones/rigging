@@ -61,6 +61,7 @@ PATCHES=(
     "0002-unix-connector.patch"       # Unix socket connector
     "0008-tor-connector.patch"        # Tor connector
     "0004-http-loader.patch"          # HTTP dispatch modifications
+    "0009-connector-injection.patch"  # Custom connector injection for Rigging
 )
 
 APPLIED=0
