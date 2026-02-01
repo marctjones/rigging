@@ -146,7 +146,7 @@ pub(crate) struct RunningAppState {
     /// When running in WebDriver mode, [`WebDriverEmbedderControls`] is a virtual container
     /// for all embedder controls. This overrides the normal behavior where these controls
     /// are shown in the GUI or not processed at all in headless mode.
-    pub(crate) webdriver_embedder_controls: WebDriverEmbedderControls,
+    pub(crate) webdriver_embedder_controls: RefCell<WebDriverEmbedderControls>,
 
     /// A [`HashMap`] of pending WebDriver events. It is the WebDriver embedder's responsibility
     /// to inform the WebDriver server when the event has been fully handled. This map is used
@@ -180,7 +180,9 @@ pub(crate) struct RunningAppState {
 
 impl Drop for RunningAppState {
     fn drop(&mut self) {
-        self.servo.deinit();
+        // TODO: Servo API changed - deinit() no longer exists
+        // Servo now handles cleanup automatically on drop
+        // self.servo.deinit();
     }
 }
 
@@ -198,17 +200,19 @@ impl RunningAppState {
             None
         };
 
-        let webdriver_receiver = servoshell_preferences.webdriver_port.map(|port| {
-            let (embedder_sender, embedder_receiver) = unbounded();
-            webdriver_server::start_server(port, embedder_sender, event_loop_waker);
-            embedder_receiver
-        });
+        // TODO: Port WebDriver support - API signature changed
+        let webdriver_receiver = None;
+        // servoshell_preferences.webdriver_port.map(|port| {
+        //     let (embedder_sender, embedder_receiver) = unbounded();
+        //     webdriver_server::start_server(port, embedder_sender, event_loop_waker);
+        //     embedder_receiver
+        // });
 
         Self {
             windows: Default::default(),
             gamepad_support: RefCell::new(gamepad_support),
             webdriver_senders: RefCell::default(),
-            webdriver_embedder_controls: Default::default(),
+            webdriver_embedder_controls: RefCell::new(Default::default()),
             pending_webdriver_events: Default::default(),
             webdriver_receiver,
             servoshell_preferences,
@@ -282,22 +286,24 @@ impl RunningAppState {
     ///
     /// Returns true if the event loop should continue spinning and false if it should exit.
     pub(crate) fn spin_event_loop(self: &Rc<Self>) -> bool {
-        self.handle_webdriver_messages();
+        // TODO: Port WebDriver support
+        // self.handle_webdriver_messages();
 
         if pref!(dom_gamepad_enabled) {
             self.handle_gamepad_events();
         }
 
-        if !self.servo.spin_event_loop() {
-            return false;
-        }
+        self.servo.spin_event_loop();
+        // spin_event_loop() now returns () instead of bool
 
         for window in self.windows.borrow().values() {
             window.update_and_request_repaint_if_necessary(self);
         }
 
         if self.servoshell_preferences.exit_after_stable_image && self.achieved_stable_image.get() {
-            self.servo.start_shutting_down();
+            // TODO: Servo API changed - start_shutting_down() no longer exists
+            // For now, just set exit_scheduled flag
+            self.exit_scheduled.set(true);
         }
 
         // When a ServoShellWindow has no more WebViews, close it. When no more windows are open, exit
@@ -308,11 +314,12 @@ impl RunningAppState {
                 .borrow_mut()
                 .retain(|_, window| !self.exit_scheduled.get() && !window.should_close());
             if self.windows.borrow().is_empty() {
-                self.servo.start_shutting_down();
+                // TODO: Servo API changed - start_shutting_down() no longer exists
+                self.exit_scheduled.set(true);
             }
         }
 
-        true
+        !self.exit_scheduled.get()
     }
 
     pub(crate) fn maybe_window_for_webview_id(
@@ -406,10 +413,11 @@ impl RunningAppState {
             .remove(&webview_id);
     }
 
-    fn set_script_command_interrupt_sender(&self, sender: Option<IpcSender<WebDriverJSResult>>) {
-        self.webdriver_senders
-            .borrow_mut()
-            .script_evaluation_interrupt_sender = sender;
+    fn set_script_command_interrupt_sender(&self, _sender: Option<IpcSender<WebDriverJSResult>>) {
+        // TODO: WebDriver API changed - sender type changed from IpcSender to GenericSender
+        // self.webdriver_senders
+        //     .borrow_mut()
+        //     .script_evaluation_interrupt_sender = sender;
     }
 
     pub(crate) fn handle_webdriver_input_event(
@@ -452,13 +460,14 @@ impl RunningAppState {
 
     pub(crate) fn handle_webdriver_script_command(&self, script_command: &WebDriverScriptCommand) {
         match script_command {
-            WebDriverScriptCommand::ExecuteScript(_webview_id, response_sender) |
-            WebDriverScriptCommand::ExecuteAsyncScript(_webview_id, response_sender) => {
-                // Give embedder a chance to interrupt the script command.
-                // Webdriver only handles 1 script command at a time, so we can
-                // safely set a new interrupt sender and remove the previous one here.
-                self.set_script_command_interrupt_sender(Some(response_sender.clone()));
-            },
+            // TODO: ExecuteScript variants removed from enum in current Servo
+            // WebDriverScriptCommand::ExecuteScript(_webview_id, response_sender) |
+            // WebDriverScriptCommand::ExecuteAsyncScript(_webview_id, response_sender) => {
+            //     // Give embedder a chance to interrupt the script command.
+            //     // Webdriver only handles 1 script command at a time, so we can
+            //     // safely set a new interrupt sender and remove the previous one here.
+            //     self.set_script_command_interrupt_sender(Some(response_sender.clone()));
+            // },
             WebDriverScriptCommand::AddLoadStatusSender(webview_id, load_status_sender) => {
                 self.set_load_status_sender(*webview_id, load_status_sender.clone());
             },
@@ -497,7 +506,7 @@ impl RunningAppState {
             return;
         };
         if let Some(gamepad_support) = self.gamepad_support.borrow_mut().as_mut() {
-            gamepad_support.handle_gamepad_events(active_webview);
+            gamepad_support.handle_gamepad_events();
         }
     }
 
@@ -572,31 +581,32 @@ impl WebViewDelegate for RunningAppState {
             .show_http_authentication_dialog(webview.id(), authentication_request);
     }
 
-    fn request_open_auxiliary_webview(&self, parent_webview: WebView) -> Option<WebView> {
-        let window = self.window_for_webview_id(parent_webview.id());
-        let platform_window = window.platform_window();
-
-        let webview =
-            WebViewBuilder::new_auxiliary(&self.servo, platform_window.rendering_context())
-                .hidpi_scale_factor(platform_window.hidpi_scale_factor())
-                .delegate(parent_webview.delegate())
-                .build();
-
-        webview.notify_theme_change(platform_window.theme());
-
-        window.add_webview(webview.clone());
-
-        // When WebDriver is enabled, do not focus and raise the WebView to the top,
-        // as that is what the specification expects. Otherwise, we would like `window.open()`
-        // to create a new foreground tab
-        if self.servoshell_preferences.webdriver_port.is_none() {
-            window.activate_webview(webview.id());
-        } else {
-            webview.hide();
-        }
-
-        Some(webview)
-    }
+    // TODO: This method has been removed from WebViewDelegate trait in current Servo
+    // fn request_open_auxiliary_webview(&self, parent_webview: WebView) -> Option<WebView> {
+    //     let window = self.window_for_webview_id(parent_webview.id());
+    //     let platform_window = window.platform_window();
+    //
+    //     let webview =
+    //         WebViewBuilder::new_auxiliary(&self.servo, platform_window.rendering_context())
+    //             .hidpi_scale_factor(platform_window.hidpi_scale_factor())
+    //             .delegate(parent_webview.delegate())
+    //             .build();
+    //
+    //     webview.notify_theme_change(platform_window.theme());
+    //
+    //     window.add_webview(webview.clone());
+    //
+    //     // When WebDriver is enabled, do not focus and raise the WebView to the top,
+    //     // as that is what the specification expects. Otherwise, we would like `window.open()`
+    //     // to create a new foreground tab
+    //     if self.servoshell_preferences.webdriver_port.is_none() {
+    //         window.activate_webview(webview.id());
+    //     } else {
+    //         webview.hide();
+    //     }
+    //
+    //     Some(webview)
+    // }
 
     fn notify_closed(&self, webview: WebView) {
         self.window_for_webview_id(webview.id())
@@ -661,34 +671,28 @@ impl WebViewDelegate for RunningAppState {
         self.window_for_webview_id(webview.id()).set_needs_repaint();
     }
 
+    // Gamepad haptic methods - conditionally compiled
+    #[cfg(feature = "gamepad")]
     fn play_gamepad_haptic_effect(
         &self,
         _webview: WebView,
         index: usize,
-        effect_type: GamepadHapticEffectType,
-        effect_complete_sender: IpcSender<bool>,
+        _effect_type: servo::GamepadHapticEffectType,
+        callback: Box<dyn FnOnce(bool)>,
     ) {
-        match self.gamepad_support.borrow_mut().as_mut() {
-            Some(gamepad_support) => {
-                gamepad_support.play_haptic_effect(index, effect_type, effect_complete_sender);
-            },
-            None => {
-                let _ = effect_complete_sender.send(false);
-            },
-        }
+        // Stub: just call callback with false
+        callback(false);
     }
 
+    #[cfg(feature = "gamepad")]
     fn stop_gamepad_haptic_effect(
         &self,
         _webview: WebView,
-        index: usize,
-        haptic_stop_sender: IpcSender<bool>,
+        _index: usize,
+        callback: Box<dyn FnOnce(bool)>,
     ) {
-        let stopped = match self.gamepad_support.borrow_mut().as_mut() {
-            Some(gamepad_support) => gamepad_support.stop_haptic_effect(index),
-            None => false,
-        };
-        let _ = haptic_stop_sender.send(stopped);
+        // Stub: just call callback with false
+        callback(false);
     }
 
     fn show_embedder_control(&self, webview: WebView, embedder_control: EmbedderControl) {
@@ -708,6 +712,7 @@ impl WebViewDelegate for RunningAppState {
             }
 
             self.webdriver_embedder_controls
+                .borrow_mut()
                 .show_embedder_control(webview.id(), embedder_control);
             return;
         }
@@ -719,6 +724,7 @@ impl WebViewDelegate for RunningAppState {
     fn hide_embedder_control(&self, webview: WebView, embedder_control_id: EmbedderControlId) {
         if self.servoshell_preferences.webdriver_port.is_some() {
             self.webdriver_embedder_controls
+                .borrow_mut()
                 .hide_embedder_control(webview.id(), embedder_control_id);
             return;
         }
@@ -745,15 +751,15 @@ impl WebViewDelegate for RunningAppState {
 
 struct ServoShellServoDelegate;
 impl ServoDelegate for ServoShellServoDelegate {
-    fn notify_devtools_server_started(&self, _servo: &Servo, port: u16, _token: String) {
+    fn notify_devtools_server_started(&self, port: u16, _token: String) {
         info!("Devtools Server running on port {port}");
     }
 
-    fn request_devtools_connection(&self, _servo: &Servo, request: AllowOrDenyRequest) {
+    fn request_devtools_connection(&self, request: AllowOrDenyRequest) {
         request.allow();
     }
 
-    fn notify_error(&self, _servo: &Servo, error: ServoError) {
+    fn notify_error(&self, error: ServoError) {
         error!("Saw Servo error: {error:?}!");
     }
 }

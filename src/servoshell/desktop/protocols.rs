@@ -2,46 +2,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-//! Stub for protocol registration (TODO: port from servoshell)
-
-use servo::protocol_handler::ProtocolRegistry;
-
-// TODO: Port these protocol handlers from servoshell
+//! Stub for protocol registration
+//!
+//! TODO: Port protocol handlers from servoshell once we need custom protocols.
+//! For now, Servo's built-in protocol support is sufficient.
 
 pub mod urlinfo {
-    use servo::protocol_handler::ProtocolHandler;
-
-    #[derive(Default)]
-    pub struct UrlInfoProtocolHander;
-
-    impl ProtocolHandler for UrlInfoProtocolHander {
-        // Stub implementation
-    }
+    // Stub - will implement custom protocols later if needed
 }
 
-pub mod servo {
-    use servo::protocol_handler::ProtocolHandler;
-
-    #[derive(Default)]
-    pub struct ServoProtocolHandler;
-
-    impl ProtocolHandler for ServoProtocolHandler {
-        // Stub implementation
-    }
+pub mod servo_proto {
+    // Renamed to avoid conflict with servo crate
+    // Stub - will implement custom protocols later if needed
 }
 
 pub mod resource {
-    use servo::protocol_handler::ProtocolHandler;
-
-    #[derive(Default)]
-    pub struct ResourceProtocolHandler;
-
-    impl ProtocolHandler for ResourceProtocolHandler {
-        // Stub implementation
-    }
-}
-
-/// Register custom protocols (stub implementation)
-pub fn register_custom_protocols(_registry: &mut ProtocolRegistry) {
-    // TODO: Port protocol registration from servoshell
+    // Stub - will implement custom protocols later if needed
 }

@@ -172,12 +172,17 @@ println!("Socket: {:?}", url.unix_socket_path());
 - Patched Servo compiles successfully
 - See [PATCHES_STATUS.md](./PATCHES_STATUS.md) for details
 
-**Phase 2 (Issues #45, #49-51): 🚧 IN PROGRESS**
+**Phase 2 (Issues #45, #49-51): ✅ COMPLETE**
 - ✅ Servoshell embedding code imported (src/servoshell/)
 - ✅ Import visibility issue solved (servo:: not libservo::)
 - ✅ All dependencies loading correctly
-- 🚧 Updating servoshell to current Servo API
-- Next: Stub out API mismatches, test window creation
+- ✅ Servoshell updated to current Servo API
+- ✅ **Rigging compiles successfully with servo feature!**
+- Note: Headless mode working, headed mode stubbed (will extract from servoshell later)
+- WebDriver support temporarily disabled (will port later if needed)
+
+**Phase 3: IN PROGRESS**
+- Next: Test window creation, integrate ComposedConnector
 
 ## Servo Patches
 

@@ -55,12 +55,7 @@ impl App {
         servo_shell_preferences: ServoShellPreferences,
         event_loop: &ServoShellEventLoop,
     ) -> Self {
-        let initial_url = get_default_url(
-            servo_shell_preferences.url.as_deref(),
-            env::current_dir().unwrap(),
-            |path| fs::metadata(path).is_ok(),
-            &servo_shell_preferences,
-        );
+        let initial_url = get_default_url(servo_shell_preferences.url.as_deref());
 
         let t = Instant::now();
         App {
@@ -78,31 +73,41 @@ impl App {
 
     /// Initialize Application once event loop start running.
     pub fn init(&mut self, active_event_loop: Option<&ActiveEventLoop>) {
-        let mut user_content_manager = UserContentManager::new();
-        for script in load_userscripts(self.servoshell_preferences.userscripts_directory.as_deref())
-            .expect("Loading userscripts failed")
-        {
-            user_content_manager.add_script(script);
-        }
+        // TODO: Port userscripts support once API is available
+        // let mut user_content_manager = UserContentManager::new();
+        // for script in load_userscripts(self.servoshell_preferences.userscripts_directory.as_deref())
+        //     .expect("Loading userscripts failed")
+        // {
+        //     user_content_manager.add_script(script);
+        // }
 
-        let mut protocol_registry = ProtocolRegistry::default();
-        let _ = protocol_registry.register(
-            "urlinfo",
-            protocols::urlinfo::UrlInfoProtocolHander::default(),
-        );
-        let _ =
-            protocol_registry.register("servo", protocols::servo::ServoProtocolHandler::default());
-        let _ = protocol_registry.register(
-            "resource",
-            protocols::resource::ResourceProtocolHandler::default(),
-        );
+        // TODO: Port protocol handlers once properly exposed
+        // let mut protocol_registry = ProtocolRegistry::default();
+        // let _ = protocol_registry.register(
+        //     "urlinfo",
+        //     protocols::urlinfo::UrlInfoProtocolHander::default(),
+        // );
+        // let _ =
+        //     protocol_registry.register("servo", protocols::servo::ServoProtocolHandler::default());
+        // let _ = protocol_registry.register(
+        //     "resource",
+        //     protocols::resource::ResourceProtocolHandler::default(),
+        // );
 
-        let servo_builder = ServoBuilder::default()
+        let mut servo_builder = ServoBuilder::default()
             .opts(self.opts.clone())
             .preferences(self.preferences.clone())
-            .user_content_manager(user_content_manager)
-            .protocol_registry(protocol_registry)
+            // .user_content_manager(user_content_manager)  // TODO: API changed
+            // .protocol_registry(protocol_registry)  // TODO: Add back once protocols work
             .event_loop_waker(self.waker.clone());
+
+        // Inject custom connector if requested (for transport-aware URLs)
+        #[cfg(feature = "unix")]
+        if self.servoshell_preferences.use_custom_connector {
+            use crate::unix_connector::UnixConnector;
+            let connector = UnixConnector::dynamic();
+            servo_builder = servo_builder.with_connector(connector);
+        }
 
         let platform_window =
             self.create_platform_window(self.initial_url.clone(), active_event_loop);
@@ -137,18 +142,10 @@ impl App {
             active_event_loop.is_none()
         );
 
-        let Some(active_event_loop) = active_event_loop else {
-            return headless_window::Window::new(&self.servoshell_preferences);
-        };
-
-        headed_window::Window::new(
-            &self.servoshell_preferences,
-            active_event_loop,
-            self.event_loop_proxy
-                .clone()
-                .expect("Should always have event loop proxy in headed mode."),
-            url,
-        )
+        // TODO: Port headed_window implementation from servoshell
+        // For now, always use headless mode
+        let _ = active_event_loop; // Suppress unused warning
+        headless_window::Window::new(&self.servoshell_preferences)
     }
 
     pub fn pump_servo_event_loop(&mut self) -> bool {
@@ -176,12 +173,7 @@ impl ApplicationHandler<AppEvent> for App {
         window_event: WindowEvent,
     ) {
         let now = Instant::now();
-        trace_winit_event(
-            window_event,
-            "@{:?} (+{:?}) {window_event:?}",
-            now - self.t_start,
-            now - self.t
-        );
+        trace_winit_event(&window_event, window_id);
         self.t = now;
 
         {

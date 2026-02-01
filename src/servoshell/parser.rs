@@ -6,8 +6,12 @@
 
 use servo::ServoUrl;
 
-/// Get default URL (stub implementation)
-pub fn get_default_url() -> ServoUrl {
-    // TODO: Port URL parsing from servoshell
-    ServoUrl::parse("about:blank").unwrap()
+/// Get default URL from optional string
+pub fn get_default_url(url: Option<&str>) -> ServoUrl {
+    match url {
+        Some(url_str) => ServoUrl::parse(url_str).unwrap_or_else(|_| {
+            ServoUrl::parse("about:blank").unwrap()
+        }),
+        None => ServoUrl::parse("about:blank").unwrap(),
+    }
 }

@@ -120,6 +120,15 @@ impl UnixConnector {
         }
     }
 
+    /// Create a connector that will parse socket paths from URIs dynamically
+    /// This is used when injecting into Servo where each request has a different URL
+    pub fn dynamic() -> Self {
+        // Use a placeholder path - will be overridden by URI parsing
+        Self {
+            socket_path: PathBuf::from("/tmp/placeholder.sock"),
+        }
+    }
+
     /// Get the socket path
     pub fn socket_path(&self) -> &Path {
         &self.socket_path
@@ -144,8 +153,20 @@ impl Service<Uri> for UnixConnector {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, _uri: Uri) -> Self::Future {
-        let socket_path = self.socket_path.clone();
+    fn call(&mut self, uri: Uri) -> Self::Future {
+        // Try to parse as transport URL to extract socket path
+        let uri_str = uri.to_string();
+        let socket_path = if let Ok(transport_url) = crate::TransportUrl::parse(&uri_str) {
+            if let Some(path) = transport_url.unix_socket_path() {
+                PathBuf::from(path)
+            } else {
+                self.socket_path.clone()
+            }
+        } else {
+            // Fallback to configured socket path
+            self.socket_path.clone()
+        };
+
         Box::pin(async move {
             let stream = UnixStream::connect(&socket_path)
                 .await
