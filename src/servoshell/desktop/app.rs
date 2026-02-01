@@ -9,6 +9,7 @@ use std::rc::Rc;
 use std::time::Instant;
 use std::{env, fs};
 
+use log::{info, debug, trace};
 use servo::protocol_handler::ProtocolRegistry;
 use servo::Opts;
 use servo::Preferences;
@@ -73,6 +74,10 @@ impl App {
 
     /// Initialize Application once event loop start running.
     pub fn init(&mut self, active_event_loop: Option<&ActiveEventLoop>) {
+        info!("🚀 Initializing application...");
+        info!("   Mode: {}", if active_event_loop.is_some() { "HEADED" } else { "HEADLESS" });
+        info!("   Initial URL: {}", self.initial_url);
+
         // TODO: Port userscripts support once API is available
         // let mut user_content_manager = UserContentManager::new();
         // for script in load_userscripts(self.servoshell_preferences.userscripts_directory.as_deref())
@@ -94,6 +99,7 @@ impl App {
         //     protocols::resource::ResourceProtocolHandler::default(),
         // );
 
+        info!("   Building Servo...");
         let mut servo_builder = ServoBuilder::default()
             .opts(self.opts.clone())
             .preferences(self.preferences.clone())
@@ -104,13 +110,17 @@ impl App {
         // Inject custom connector if requested (for transport-aware URLs)
         #[cfg(feature = "unix")]
         if self.servoshell_preferences.use_custom_connector {
+            info!("   Enabling custom Unix connector");
             use crate::unix_connector::UnixConnector;
             let connector = UnixConnector::dynamic();
             servo_builder = servo_builder.with_connector(connector);
         }
 
+        info!("   Creating platform window...");
         let platform_window =
             self.create_platform_window(self.initial_url.clone(), active_event_loop);
+        info!("   ✓ Platform window created");
+
         #[cfg(feature = "webxr")]
         let servo_builder =
             servo_builder.webxr_registry(super::webxr::XrDiscoveryWebXrRegistry::new_boxed(
@@ -119,17 +129,22 @@ impl App {
                 &self.preferences,
             ));
 
+        info!("   Building Servo instance...");
         let servo = servo_builder.build();
         servo.setup_logging();
+        info!("   ✓ Servo built and logging configured");
 
+        info!("   Creating running state and initial window...");
         let running_state = Rc::new(RunningAppState::new(
             servo,
             self.servoshell_preferences.clone(),
             self.waker.clone(),
         ));
         running_state.create_window(platform_window, self.initial_url.as_url().clone());
+        info!("   ✓ Window created with initial URL");
 
         self.state = AppState::Running(running_state);
+        info!("✅ Application initialization complete!");
     }
 
     fn create_platform_window(
@@ -167,6 +182,7 @@ impl App {
 
 impl ApplicationHandler<AppEvent> for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        info!("▶️  Event loop resumed, initializing...");
         self.init(Some(event_loop));
     }
 

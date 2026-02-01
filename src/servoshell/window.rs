@@ -6,6 +6,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use euclid::Scale;
+use log::{info, debug, trace};
 use servo::GenericSender;
 use servo::{DeviceIndependentIntRect, DeviceIndependentPixel};
 use servo::{DeviceIntPoint, DeviceIntSize, DevicePixel};
@@ -76,35 +77,47 @@ impl ServoShellWindow {
         state: Rc<RunningAppState>,
         url: Url,
     ) -> WebView {
+        info!("🌐 Creating and activating webview for URL: {}", url);
         let webview = self.create_toplevel_webview(state, url);
         self.activate_webview(webview.id());
+        info!("   ✓ Webview {} activated", webview.id());
         webview
     }
 
     pub(crate) fn create_toplevel_webview(&self, state: Rc<RunningAppState>, url: Url) -> WebView {
+        debug!("   Building webview...");
         let webview = WebViewBuilder::new(state.servo(), self.platform_window.rendering_context())
-            .url(url)
+            .url(url.clone())
             .hidpi_scale_factor(self.platform_window.hidpi_scale_factor())
             .delegate(state.clone())
             .build();
 
+        debug!("   Setting theme and adding to collection...");
         webview.notify_theme_change(self.platform_window.theme());
         self.add_webview(webview.clone());
+        debug!("   ✓ Webview {} created for {}", webview.id(), url);
         webview
     }
 
     /// Repaint the focused [`WebView`].
     pub(crate) fn repaint_webviews(&self) {
         let Some(webview) = self.active_webview() else {
+            trace!("⚠️  No active webview to repaint");
             return;
         };
 
+        trace!("🖌️  Repainting webview {}", webview.id());
         self.platform_window()
             .rendering_context()
             .make_current()
             .unwrap();
+        trace!("   Rendering context made current");
+
         webview.paint();
+        trace!("   Webview painted");
+
         self.platform_window().rendering_context().present();
+        trace!("   ✓ Frame presented to window");
     }
 
     /// Whether or not this [`ServoShellWindow`] has any [`WebView`]s.

@@ -227,9 +227,13 @@ impl RunningAppState {
         platform_window: Rc<dyn PlatformWindow>,
         initial_url: Url,
     ) {
+        info!("🏠 Creating window for URL: {}", initial_url);
         let window = Rc::new(ServoShellWindow::new(platform_window));
+        let window_id = window.id();
+
         window.create_and_activate_toplevel_webview(self.clone(), initial_url);
-        self.windows.borrow_mut().insert(window.id(), window);
+        self.windows.borrow_mut().insert(window_id, window);
+        info!("   ✓ Window registered in state");
     }
 
     pub(crate) fn windows<'a>(
