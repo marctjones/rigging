@@ -144,7 +144,7 @@ impl Window {
     pub(crate) fn handle_winit_window_event(
         &self,
         _state: Rc<RunningAppState>,
-        _window: &ServoShellWindow,
+        window: &ServoShellWindow,
         event: WindowEvent,
     ) {
         match event {
@@ -159,7 +159,10 @@ impl Window {
                 self.modifiers_state.set(new_modifiers.state());
             }
             WindowEvent::RedrawRequested => {
-                // Handled by compositor
+                // Paint webview to window
+                // WARNING: do not defer painting or presenting to some later tick of the event
+                // loop or the window may become unresponsive! (servo#30312)
+                window.repaint_webviews();
             }
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                 debug!("Scale factor changed to {}", scale_factor);
