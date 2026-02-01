@@ -110,13 +110,13 @@ pub fn run_browser(
     });
 }
 
-/// Run browser with Servo engine
+/// Run browser with Servo engine (direct servoshell embedding)
 #[cfg(all(feature = "servo", not(feature = "webview")))]
 pub fn run_browser(
     config: BrowserConfig,
     event_callback: Option<EventCallback>,
 ) -> Result<(), EmbedError> {
-    super::servo_backend::run_browser(config, event_callback)
+    super::servoshell_backend::run_browser(config, event_callback)
 }
 
 /// Run browser - fallback when no backend is available

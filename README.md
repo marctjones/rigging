@@ -181,8 +181,10 @@ println!("Socket: {:?}", url.unix_socket_path());
 - Note: Headless mode working, headed mode stubbed (will extract from servoshell later)
 - WebDriver support temporarily disabled (will port later if needed)
 
-**Phase 3: IN PROGRESS**
-- Next: Test window creation, integrate ComposedConnector
+**Phase 3: 🚧 IN PROGRESS**
+- ✅ UnixConnector integrated into servoshell (with_connector injection)
+- ✅ Dynamic URI parsing for socket path extraction
+- Next: Create public embedding API, test window creation
 
 ## Servo Patches
 

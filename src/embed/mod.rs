@@ -97,7 +97,9 @@ mod events;
 mod builder;
 mod backend;
 #[cfg(feature = "servo")]
-mod servo_backend;
+mod servo_backend; // Old subprocess approach
+#[cfg(feature = "servo")]
+mod servoshell_backend; // New direct embedding approach
 
 pub use config::BrowserConfig;
 pub use events::{BrowserEvent, NavigationEvent, LoadState};
