@@ -142,10 +142,14 @@ impl App {
             active_event_loop.is_none()
         );
 
-        // TODO: Port headed_window implementation from servoshell
-        // For now, always use headless mode
-        let _ = active_event_loop; // Suppress unused warning
-        headless_window::Window::new(&self.servoshell_preferences)
+        if self.servoshell_preferences.headless {
+            // Headless mode - no window
+            headless_window::Window::new(&self.servoshell_preferences)
+        } else {
+            // Headed mode - create actual window
+            let event_loop = active_event_loop.expect("Headed mode requires ActiveEventLoop");
+            headed_window::Window::new(&self.servoshell_preferences, event_loop)
+        }
     }
 
     pub fn pump_servo_event_loop(&mut self) -> bool {
