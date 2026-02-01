@@ -14,8 +14,8 @@ use crate::servoshell::desktop::app::App;
 use crate::servoshell::desktop::event_loop::ServoShellEventLoop;
 use crate::servoshell::stubs::ServoShellPreferences;
 use euclid::Size2D;
-use log::{debug, info, warn};
-use servo::{DeviceIndependentPixel, Opts, Preferences, ServoUrl};
+use log::{debug, info};
+use servo::{Opts, Preferences, ServoUrl};
 
 /// Run the browser using direct servoshell embedding
 pub fn run_browser(
@@ -31,9 +31,31 @@ pub fn run_browser(
     debug!("Window: {}x{}", config.width, config.height);
     debug!("URL: {}", config.url);
 
+    // Convert transport-aware URL to standard URL for Servo's parser
+    // The connector will handle the actual transport URL parsing
+    let servo_url = if config.url.contains("::unix") {
+        debug!("Detected Unix socket URL");
+        // Unix socket URL - use localhost as placeholder
+        "http://localhost/".to_string()
+    } else if config.url.contains("::tor") {
+        debug!("Detected Tor URL");
+        // Tor URL - use .onion domain
+        config.url.replace("::tor:", "://")
+    } else if config.url.contains("::tcp") {
+        debug!("Detected TCP URL");
+        // TCP URL - remove transport prefix
+        config.url.replace("::tcp:", "://")
+    } else {
+        debug!("Standard URL, no conversion needed");
+        // Standard URL
+        config.url.clone()
+    };
+
+    debug!("Converted URL: {} -> {}", config.url, servo_url);
+
     // Parse URL
-    let url = ServoUrl::parse(&config.url)
-        .map_err(|e| EmbedError::InitFailed(format!("Invalid URL: {}", e)))?;
+    let url = ServoUrl::parse(&servo_url)
+        .map_err(|e| EmbedError::InitFailed(format!("Invalid URL '{}': {}", servo_url, e)))?;
 
     // Create servoshell preferences
     let mut prefs = ServoShellPreferences {
@@ -50,6 +72,11 @@ pub fn run_browser(
         userscripts_directory: None,
         use_custom_connector: true, // Enable transport-aware URLs
     };
+
+    // Install default crypto provider (required for TLS/HTTPS)
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .ok(); // Ignore error if already installed
 
     // Create Servo opts
     let opts = Opts::default();
@@ -71,16 +98,13 @@ pub fn run_browser(
     info!("Launching servoshell with URL: {}", config.url);
     let mut app = App::new(opts, preferences, prefs, &event_loop);
 
-    // TODO: Properly integrate event_callback into servoshell event loop
-    // For now, just run the app (this blocks until shutdown)
-    // Note: run_app() doesn't exist yet - we need to implement it
-    // For now, just initialize and return
-    app.init(None);
+    info!("Starting event loop...");
 
-    // TODO: Run the event loop
-    warn!("Servoshell event loop not yet implemented - initialization only");
+    // Run the event loop (this blocks until the window is closed)
+    // Note: app.init() will be called automatically by winit via the resumed() callback
+    event_loop.run_app(&mut app);
 
-    // Emit close
+    // Emit close event
     if let Some(ref cb) = event_callback {
         cb(BrowserEvent::CloseRequested);
     }
