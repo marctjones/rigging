@@ -60,10 +60,11 @@ impl Window {
         servoshell_preferences: &ServoShellPreferences,
         event_loop: &ActiveEventLoop,
     ) -> Rc<Self> {
-        info!("🪟 Creating headed window...");
+        // Use println! here because logging isn't set up yet
+        println!("🪟 Creating headed window...");
 
         let inner_size = servoshell_preferences.initial_window_size;
-        info!("   Window size: {}x{}", inner_size.width, inner_size.height);
+        println!("   Window size: {}x{}", inner_size.width, inner_size.height);
 
         let window_attr = winit::window::Window::default_attributes()
             .with_title(INITIAL_WINDOW_TITLE.to_string())
@@ -75,7 +76,7 @@ impl Window {
             ))
             .with_visible(true); // Start visible
 
-        info!("   Creating winit window...");
+        println!("   Creating winit window...");
         // Note: with_name() is only available on some platforms
         // Skip for now - not critical
 
@@ -84,14 +85,14 @@ impl Window {
             .create_window(window_attr)
             .expect("Failed to create window.");
 
-        info!("   ✓ Winit window created with ID: {:?}", winit_window.id());
+        println!("   ✓ Winit window created with ID: {:?}", winit_window.id());
 
         let monitor = winit_window
             .current_monitor()
             .or_else(|| winit_window.available_monitors().nth(0))
             .expect("No monitor detected");
 
-        info!("   Monitor: {:?}", monitor.name());
+        println!("   Monitor: {:?}", monitor.name());
 
         let (screen_size, screen_scale) = servoshell_preferences
             .screen_size_override
@@ -103,10 +104,10 @@ impl Window {
         let screen_scale: Scale<f64, DeviceIndependentPixel, DevicePixel> = Scale::new(screen_scale);
         let screen_size = (winit_size_to_euclid_size(screen_size).to_f64() / screen_scale).to_u32();
         let inner_size = winit_window.inner_size();
-        info!("   Screen size: {:?}, Inner size: {:?}", screen_size, inner_size);
+        println!("   Screen size: {:?}, Inner size: {:?}", screen_size, inner_size);
 
         // Create rendering contexts
-        info!("   Creating rendering contexts...");
+        println!("   Creating rendering contexts...");
         let display_handle = event_loop
             .display_handle()
             .expect("could not get display handle");
@@ -114,19 +115,19 @@ impl Window {
             .window_handle()
             .expect("could not get window handle");
 
-        trace!("   Got display and window handles");
+        println!("   Got display and window handles");
 
         let window_rendering_context = Rc::new(
             WindowRenderingContext::new(display_handle, window_handle, inner_size)
                 .expect("Could not create WindowRenderingContext"),
         );
-        info!("   ✓ WindowRenderingContext created");
+        println!("   ✓ WindowRenderingContext created");
 
         // Note: make_current() may not be available - rendering context handles this internally
         let rendering_context = Rc::new(window_rendering_context.offscreen_context(inner_size));
-        info!("   ✓ OffscreenRenderingContext created");
+        println!("   ✓ OffscreenRenderingContext created");
 
-        info!("✓ Window creation complete: {:?}", winit_window.id());
+        println!("✅ Window creation complete: {:?}", winit_window.id());
 
         Rc::new(Window {
             winit_window,
@@ -153,58 +154,6 @@ impl Window {
 
     pub(crate) fn window_rendering_context(&self) -> Rc<WindowRenderingContext> {
         self.window_rendering_context.clone()
-    }
-
-    /// Handle winit window events
-    pub(crate) fn handle_winit_window_event(
-        &self,
-        _state: Rc<RunningAppState>,
-        window: &ServoShellWindow,
-        event: WindowEvent,
-    ) {
-        match event {
-            WindowEvent::Resized(new_size) => {
-                info!("📐 Window resized to {:?}", new_size);
-                self.inner_size.set(new_size);
-            }
-            WindowEvent::CloseRequested => {
-                info!("🚪 Window close requested");
-            }
-            WindowEvent::ModifiersChanged(new_modifiers) => {
-                trace!("⌨️  Modifiers changed: {:?}", new_modifiers.state());
-                self.modifiers_state.set(new_modifiers.state());
-            }
-            WindowEvent::RedrawRequested => {
-                // Paint webview to window
-                // WARNING: do not defer painting or presenting to some later tick of the event
-                // loop or the window may become unresponsive! (servo#30312)
-                trace!("🎨 RedrawRequested - painting webviews");
-                window.repaint_webviews();
-                trace!("   ✓ Painting complete");
-            }
-            WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                info!("🔍 Scale factor changed to {}", scale_factor);
-            }
-            WindowEvent::Focused(focused) => {
-                info!("👁️  Window focus changed: {}", focused);
-            }
-            WindowEvent::Occluded(occluded) => {
-                info!("🙈 Window occluded: {}", occluded);
-            }
-            ref e => {
-                trace!("⚡ Window event: {:?}", e);
-            }
-        }
-    }
-
-    /// Handle winit app events (custom events)
-    pub(crate) fn handle_winit_app_event(
-        &self,
-        _state: Rc<RunningAppState>,
-        _window: &ServoShellWindow,
-        _app_event: super::event_loop::AppEvent,
-    ) {
-        // No custom app event handling needed for Rigging (no egui/accessibility)
     }
 }
 
@@ -257,6 +206,7 @@ impl PlatformWindow for Window {
     }
 
     fn request_repaint(&self, _: &ServoShellWindow) {
+        trace!("📢 Requesting window redraw from winit");
         self.winit_window.request_redraw();
     }
 
@@ -394,5 +344,56 @@ impl PlatformWindow for Window {
 
     fn focused(&self) -> bool {
         self.winit_window.has_focus()
+    }
+
+    // Override trait's empty default implementation
+    fn handle_winit_window_event(
+        &self,
+        _state: Rc<RunningAppState>,
+        window: &ServoShellWindow,
+        event: WindowEvent,
+    ) {
+        match event {
+            WindowEvent::Resized(new_size) => {
+                info!("📐 Window resized to {:?}", new_size);
+                self.inner_size.set(new_size);
+            }
+            WindowEvent::CloseRequested => {
+                info!("🚪 Window close requested");
+            }
+            WindowEvent::ModifiersChanged(new_modifiers) => {
+                trace!("⌨️  Modifiers changed: {:?}", new_modifiers.state());
+                self.modifiers_state.set(new_modifiers.state());
+            }
+            WindowEvent::RedrawRequested => {
+                // Paint webview to window
+                // WARNING: do not defer painting or presenting to some later tick of the event
+                // loop or the window may become unresponsive! (servo#30312)
+                trace!("🎨 RedrawRequested - painting webviews");
+                window.repaint_webviews();
+                trace!("   ✓ Painting complete");
+            }
+            WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                info!("🔍 Scale factor changed to {}", scale_factor);
+            }
+            WindowEvent::Focused(focused) => {
+                info!("👁️  Window focus changed: {}", focused);
+            }
+            WindowEvent::Occluded(occluded) => {
+                info!("🙈 Window occluded: {}", occluded);
+            }
+            ref e => {
+                trace!("⚡ Window event: {:?}", e);
+            }
+        }
+    }
+
+    fn handle_winit_app_event(
+        &self,
+        _state: Rc<RunningAppState>,
+        _window: &ServoShellWindow,
+        _app_event: super::event_loop::AppEvent,
+    ) {
+        // No custom app event handling needed for Rigging (no egui/accessibility)
     }
 }

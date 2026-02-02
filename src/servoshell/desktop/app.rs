@@ -74,9 +74,10 @@ impl App {
 
     /// Initialize Application once event loop start running.
     pub fn init(&mut self, active_event_loop: Option<&ActiveEventLoop>) {
-        info!("🚀 Initializing application...");
-        info!("   Mode: {}", if active_event_loop.is_some() { "HEADED" } else { "HEADLESS" });
-        info!("   Initial URL: {}", self.initial_url);
+        // Use println! because logging isn't set up yet
+        println!("\n🚀 Initializing application...");
+        println!("   Mode: {}", if active_event_loop.is_some() { "HEADED (GUI)" } else { "HEADLESS" });
+        println!("   Initial URL: {}", self.initial_url);
 
         // TODO: Port userscripts support once API is available
         // let mut user_content_manager = UserContentManager::new();
@@ -169,20 +170,24 @@ impl App {
 
     pub fn pump_servo_event_loop(&mut self) -> bool {
         let AppState::Running(state) = &self.state else {
+            trace!("⚠️  Pump called but not in Running state");
             return false;
         };
 
+        trace!("🔄 Pumping Servo event loop...");
         if !state.spin_event_loop() {
+            info!("🛑 Servo event loop returned false, shutting down");
             self.state = AppState::ShuttingDown;
             return false;
         }
+        trace!("   ✓ Event loop pump complete");
         true
     }
 }
 
 impl ApplicationHandler<AppEvent> for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        info!("▶️  Event loop resumed, initializing...");
+        println!("▶️  Event loop resumed, initializing...");
         self.init(Some(event_loop));
     }
 
@@ -193,20 +198,25 @@ impl ApplicationHandler<AppEvent> for App {
         window_event: WindowEvent,
     ) {
         let now = Instant::now();
+        trace!("⚡ window_event received: {:?} for window {:?}", window_event, window_id);
         trace_winit_event(&window_event, window_id);
         self.t = now;
 
         {
             let AppState::Running(state) = &self.state else {
+                trace!("   Ignoring: App not in Running state");
                 return;
             };
             let window_id: u64 = window_id.into();
             if let Some(window) = state.window(window_id.into()) {
+                trace!("   Dispatching to window handler");
                 window.platform_window().handle_winit_window_event(
                     state.clone(),
                     &window,
                     window_event,
                 );
+            } else {
+                trace!("   ⚠️  No window found for ID: {}", window_id);
             }
         }
 

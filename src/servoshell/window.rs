@@ -204,6 +204,7 @@ impl ServoShellWindow {
         // Currently, egui-file-dialog dialogs need to be constantly redrawn or animations aren't fluid.
         let needs_repaint = self.needs_repaint.take();
         if updated_user_interface || needs_repaint {
+            trace!("🎨 Requesting repaint (UI updated: {}, needs repaint: {})", updated_user_interface, needs_repaint);
             self.platform_window.request_repaint(self);
         }
     }
