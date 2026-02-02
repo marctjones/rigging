@@ -55,6 +55,21 @@ impl ServoShellEventLoop {
     }
 
     pub(crate) fn headed() -> ServoShellEventLoop {
+        // Force X11 backend on Linux for better GNOME compatibility
+        // winit 0.30 + GNOME Wayland has window visibility issues
+        #[cfg(target_os = "linux")]
+        {
+            use winit::platform::x11::EventLoopBuilderExtX11;
+            println!("🔧 Forcing X11 backend (XWayland) for GNOME compatibility...");
+            ServoShellEventLoop::Winit(
+                WinitEventLoop::with_user_event()
+                    .with_x11()  // Force X11 backend
+                    .build()
+                    .expect("Could not start winit event loop with X11 backend"),
+            )
+        }
+
+        #[cfg(not(target_os = "linux"))]
         ServoShellEventLoop::Winit(
             WinitEventLoop::with_user_event()
                 .build()

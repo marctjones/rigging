@@ -22,6 +22,8 @@ use winit::dpi::{LogicalSize, PhysicalPosition, PhysicalSize};
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::ModifiersState;
+#[cfg(target_os = "linux")]
+use winit::platform::wayland::WindowAttributesExtWayland;
 
 use crate::servoshell::stubs::ServoShellPreferences;
 use crate::servoshell::running_app_state::RunningAppState;
@@ -62,11 +64,10 @@ impl Window {
         servoshell_preferences: &ServoShellPreferences,
         event_loop: &ActiveEventLoop,
     ) -> Rc<Self> {
-        // Use println! here because logging isn't set up yet
-        println!("🪟 Creating headed window...");
+        info!("Creating headed window");
 
         let inner_size = servoshell_preferences.initial_window_size;
-        println!("   Window size: {}x{}", inner_size.width, inner_size.height);
+        trace!("Window size: {}x{}", inner_size.width, inner_size.height);
 
         let window_attr = winit::window::Window::default_attributes()
             .with_title(INITIAL_WINDOW_TITLE.to_string())
@@ -76,25 +77,30 @@ impl Window {
                 MIN_WINDOW_INNER_SIZE.width,
                 MIN_WINDOW_INNER_SIZE.height,
             ))
-            .with_visible(true); // Start visible
+            .with_position(winit::dpi::LogicalPosition::new(100, 100)) // Explicit position
+            .with_visible(true); // Start visible immediately (no accessibility setup needed)
 
-        println!("   Creating winit window...");
-        // Note: with_name() is only available on some platforms
-        // Skip for now - not critical
+        // Set app ID for Wayland - CRITICAL for proper window identification on GNOME/Wayland
+        #[cfg(target_os = "linux")]
+        let window_attr = window_attr.with_name("org.rigging.Rigging", "Rigging");
 
         #[allow(deprecated)]
         let winit_window = event_loop
             .create_window(window_attr)
             .expect("Failed to create window.");
 
-        println!("   ✓ Winit window created with ID: {:?}", winit_window.id());
+        trace!("Winit window created with ID: {:?}", winit_window.id());
+
+        // Force window to be visible and focused
+        winit_window.set_visible(true);
+        winit_window.focus_window();
 
         let monitor = winit_window
             .current_monitor()
             .or_else(|| winit_window.available_monitors().nth(0))
             .expect("No monitor detected");
 
-        println!("   Monitor: {:?}", monitor.name());
+        trace!("Monitor: {:?}, size: {:?}", monitor.name(), monitor.size());
 
         let (screen_size, screen_scale) = servoshell_preferences
             .screen_size_override
@@ -106,10 +112,8 @@ impl Window {
         let screen_scale: Scale<f64, DeviceIndependentPixel, DevicePixel> = Scale::new(screen_scale);
         let screen_size = (winit_size_to_euclid_size(screen_size).to_f64() / screen_scale).to_u32();
         let inner_size = winit_window.inner_size();
-        println!("   Screen size: {:?}, Inner size: {:?}", screen_size, inner_size);
 
         // Create rendering contexts
-        println!("   Creating rendering contexts...");
         let display_handle = event_loop
             .display_handle()
             .expect("could not get display handle");
@@ -117,21 +121,16 @@ impl Window {
             .window_handle()
             .expect("could not get window handle");
 
-        println!("   Got display and window handles");
-
         let window_rendering_context = Rc::new(
             WindowRenderingContext::new(display_handle, window_handle, inner_size)
                 .expect("Could not create WindowRenderingContext"),
         );
-        println!("   ✓ WindowRenderingContext created");
 
-        // Note: make_current() may not be available - rendering context handles this internally
         let rendering_context = Rc::new(window_rendering_context.offscreen_context(inner_size));
-        println!("   ✓ OffscreenRenderingContext created");
 
-        println!("✅ Window creation complete: {:?}", winit_window.id());
+        info!("Window created successfully");
 
-        Rc::new(Window {
+        let window = Rc::new(Window {
             winit_window,
             screen_size,
             monitor,
@@ -142,7 +141,16 @@ impl Window {
             rendering_context,
             window_rendering_context,
             webview_relative_mouse_point: Cell::new(Point2D::zero()),
-        })
+        });
+
+        // Show window after all setup is complete
+        window.winit_window.set_visible(true);
+        window.winit_window.set_minimized(false);
+        window.winit_window.set_maximized(true);
+        window.winit_window.focus_window();
+        window.winit_window.request_redraw();
+
+        window
     }
 
     fn toolbar_height(&self) -> f32 {
@@ -357,35 +365,34 @@ impl PlatformWindow for Window {
     ) {
         match event {
             WindowEvent::Resized(new_size) => {
-                info!("📐 Window resized to {:?}", new_size);
+                info!("Window resized to {:?}", new_size);
                 self.inner_size.set(new_size);
             }
             WindowEvent::CloseRequested => {
-                info!("🚪 Window close requested");
+                info!("Window close requested");
             }
             WindowEvent::ModifiersChanged(new_modifiers) => {
-                trace!("⌨️  Modifiers changed: {:?}", new_modifiers.state());
+                trace!("Modifiers changed: {:?}", new_modifiers.state());
                 self.modifiers_state.set(new_modifiers.state());
             }
             WindowEvent::RedrawRequested => {
                 // Paint webview to window
                 // WARNING: do not defer painting or presenting to some later tick of the event
                 // loop or the window may become unresponsive! (servo#30312)
-                trace!("🎨 RedrawRequested - painting webviews");
+                trace!("Repainting webviews");
                 window.repaint_webviews();
-                trace!("   ✓ Painting complete");
             }
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                info!("🔍 Scale factor changed to {}", scale_factor);
+                info!("Scale factor changed to {}", scale_factor);
             }
             WindowEvent::Focused(focused) => {
-                info!("👁️  Window focus changed: {}", focused);
+                info!("Window focus changed: {}", focused);
             }
             WindowEvent::Occluded(occluded) => {
-                info!("🙈 Window occluded: {}", occluded);
+                trace!("Window occluded: {}", occluded);
             }
             ref e => {
-                trace!("⚡ Window event: {:?}", e);
+                trace!("Window event: {:?}", e);
             }
         }
     }
