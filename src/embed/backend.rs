@@ -17,7 +17,7 @@
 use super::config::BrowserConfig;
 use super::events::{BrowserEvent, EventCallback};
 use super::EmbedError;
-// use log::{info, warn}; // Unused currently
+use log::{info, warn};
 
 /// Run the browser with the given configuration
 ///

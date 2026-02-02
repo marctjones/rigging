@@ -31,31 +31,14 @@ pub fn run_browser(
     debug!("Window: {}x{}", config.width, config.height);
     debug!("URL: {}", config.url);
 
-    // Convert transport-aware URL to standard URL for Servo's parser
-    // The connector will handle the actual transport URL parsing
-    let servo_url = if config.url.contains("::unix") {
-        debug!("Detected Unix socket URL");
-        // Unix socket URL - use localhost as placeholder
-        "http://localhost/".to_string()
-    } else if config.url.contains("::tor") {
-        debug!("Detected Tor URL");
-        // Tor URL - use .onion domain
-        config.url.replace("::tor:", "://")
-    } else if config.url.contains("::tcp") {
-        debug!("Detected TCP URL");
-        // TCP URL - remove transport prefix
-        config.url.replace("::tcp:", "://")
-    } else {
-        debug!("Standard URL, no conversion needed");
-        // Standard URL
-        config.url.clone()
-    };
+    // Convert transport-aware URL to standard URL for Servo's URL parser only
+    // The actual HTTP requests will use the original transport URL via the connector
+    let servo_url_str = convert_transport_url_for_parser(&config.url);
+    debug!("URL for Servo parser: {} -> {}", config.url, servo_url_str);
 
-    debug!("Converted URL: {} -> {}", config.url, servo_url);
-
-    // Parse URL
-    let _url = ServoUrl::parse(&servo_url)
-        .map_err(|e| EmbedError::InitFailed(format!("Invalid URL '{}': {}", servo_url, e)))?;
+    // Parse URL using Servo's parser
+    let _url = ServoUrl::parse(&servo_url_str)
+        .map_err(|e| EmbedError::InitFailed(format!("Invalid URL '{}': {}", servo_url_str, e)))?;
 
     // Create servoshell preferences
     let prefs = ServoShellPreferences {
@@ -111,4 +94,30 @@ pub fn run_browser(
 
     info!("Servoshell exited");
     Ok(())
+}
+
+/// Convert transport-aware URL to standard URL for Servo's parser
+///
+/// This is only used for Servo's URL parser which doesn't understand transport prefixes.
+/// The actual HTTP connector receives the original transport URL and handles it correctly.
+///
+/// Examples:
+/// - `http::unix///tmp/app.sock/` -> `http://localhost/`
+/// - `http::tcp//example.com/` -> `http://example.com/`
+/// - `http://example.com/` -> `http://example.com/` (unchanged)
+fn convert_transport_url_for_parser(url: &str) -> String {
+    if url.contains("::unix") {
+        // Unix socket URL - use localhost as placeholder for parser
+        // The connector will parse the actual socket path from the original URL
+        "http://localhost/".to_string()
+    } else if url.contains("::tor") {
+        // Tor URL - convert to standard URL format
+        url.replace("::tor:", "://")
+    } else if url.contains("::tcp") {
+        // TCP URL - remove transport prefix
+        url.replace("::tcp:", "://")
+    } else {
+        // Standard URL - return as-is
+        url.to_string()
+    }
 }

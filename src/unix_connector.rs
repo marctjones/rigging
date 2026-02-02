@@ -96,6 +96,12 @@ impl hyper::rt::Write for UnixConnection {
     }
 }
 
+impl hyper_util::client::legacy::connect::Connection for UnixConnection {
+    fn connected(&self) -> hyper_util::client::legacy::connect::Connected {
+        hyper_util::client::legacy::connect::Connected::new()
+    }
+}
+
 /// Unix socket connector for Hyper HTTP clients
 ///
 /// # Example
