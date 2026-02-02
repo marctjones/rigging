@@ -54,11 +54,11 @@ pub fn run_browser(
     debug!("Converted URL: {} -> {}", config.url, servo_url);
 
     // Parse URL
-    let url = ServoUrl::parse(&servo_url)
+    let _url = ServoUrl::parse(&servo_url)
         .map_err(|e| EmbedError::InitFailed(format!("Invalid URL '{}': {}", servo_url, e)))?;
 
     // Create servoshell preferences
-    let mut prefs = ServoShellPreferences {
+    let prefs = ServoShellPreferences {
         url: Some(config.url.clone()),
         width: Some(config.width),
         height: Some(config.height),

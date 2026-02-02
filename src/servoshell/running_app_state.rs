@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::rc::Rc;
 
-use crossbeam_channel::{Receiver, Sender, unbounded};
+use crossbeam_channel::{Receiver, Sender};
 use euclid::Rect;
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use log::{error, info, warn};
@@ -25,7 +25,7 @@ use servo::{
     InputEvent, InputEventId, InputEventResult, JSValue, LoadStatus,
     MediaSessionEvent, PermissionRequest, ScreenshotCaptureError, Servo, ServoDelegate, ServoError,
     TraversalId, WebDriverCommandMsg, WebDriverJSResult, WebDriverLoadStatus,
-    WebDriverScriptCommand, WebDriverSenders, WebView, WebViewBuilder, WebViewDelegate,
+    WebDriverScriptCommand, WebDriverSenders, WebView, WebViewDelegate,
 };
 use url::Url;
 
@@ -48,6 +48,7 @@ pub struct WebViewCollection {
     active_webview_id: Option<WebViewId>,
 }
 
+#[allow(dead_code)] // Some methods unused but preserved from servoshell API
 impl WebViewCollection {
     pub fn add(&mut self, webview: WebView) {
         let id = webview.id();
@@ -136,6 +137,7 @@ impl WebViewCollection {
     }
 }
 
+#[allow(dead_code)] // Some fields unused but preserved from servoshell API
 pub(crate) struct RunningAppState {
     /// Gamepad support, which may be `None` if it failed to initialize.
     gamepad_support: RefCell<Option<GamepadSupport>>,
@@ -186,11 +188,12 @@ impl Drop for RunningAppState {
     }
 }
 
+#[allow(dead_code)] // Many methods unused but preserved from servoshell API
 impl RunningAppState {
     pub(crate) fn new(
         servo: Servo,
         servoshell_preferences: ServoShellPreferences,
-        event_loop_waker: Box<dyn EventLoopWaker>,
+        _event_loop_waker: Box<dyn EventLoopWaker>,
     ) -> Self {
         servo.set_delegate(Rc::new(ServoShellServoDelegate));
 
@@ -503,7 +506,7 @@ impl RunningAppState {
     }
 
     pub(crate) fn handle_gamepad_events(&self) {
-        let Some(active_webview) = self
+        let Some(_active_webview) = self
             .focused_window()
             .and_then(|window| window.active_webview())
         else {

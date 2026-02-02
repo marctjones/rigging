@@ -7,14 +7,14 @@
 use std::path::Path;
 use std::rc::Rc;
 use std::time::Instant;
-use std::{env, fs};
+// use std::{env, fs}; // Unused currently
 
-use log::{info, debug, trace};
-use servo::protocol_handler::ProtocolRegistry;
+use log::{info, trace};
+// use servo::protocol_handler::ProtocolRegistry; // TODO: Re-enable when protocols work
 use servo::Opts;
 use servo::Preferences;
 use servo::ServoUrl;
-use servo::{UserContentManager, UserScript};
+use servo::UserScript;
 use servo::{EventLoopWaker, ServoBuilder};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -24,7 +24,7 @@ use winit::window::WindowId;
 use super::event_loop::AppEvent;
 use super::{headed_window, headless_window};
 use crate::servoshell::desktop::event_loop::ServoShellEventLoop;
-use crate::servoshell::desktop::protocols;
+// use crate::servoshell::desktop::protocols; // TODO: Re-enable when protocols work
 use crate::servoshell::desktop::tracing::trace_winit_event;
 use crate::servoshell::parser::get_default_url;
 use crate::servoshell::stubs::ServoShellPreferences;
@@ -37,6 +37,7 @@ pub(crate) enum AppState {
     ShuttingDown,
 }
 
+#[allow(dead_code)] // Some fields unused but may be needed in future
 pub struct App {
     opts: Opts,
     preferences: Preferences,
@@ -50,7 +51,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(
+    pub(crate) fn new(
         opts: Opts,
         preferences: Preferences,
         servo_shell_preferences: ServoShellPreferences,
@@ -150,7 +151,7 @@ impl App {
 
     fn create_platform_window(
         &self,
-        url: ServoUrl,
+        _url: ServoUrl,
         active_event_loop: Option<&ActiveEventLoop>,
     ) -> Rc<dyn PlatformWindow> {
         assert_eq!(
@@ -253,6 +254,7 @@ impl ApplicationHandler<AppEvent> for App {
     }
 }
 
+#[allow(dead_code)] // Will be used when userscripts support is re-enabled
 fn load_userscripts(userscripts_directory: Option<&Path>) -> std::io::Result<Vec<UserScript>> {
     let mut userscripts = Vec::new();
     if let Some(userscripts_directory) = &userscripts_directory {

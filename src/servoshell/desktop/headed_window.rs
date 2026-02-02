@@ -11,7 +11,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use euclid::{Point2D, Scale, Size2D};
-use log::{debug, info, trace};
+use log::{info, trace};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use servo::{
     Cursor, DeviceIndependentIntRect, DeviceIndependentPixel, DeviceIntPoint, DeviceIntRect,
@@ -40,6 +40,7 @@ fn winit_size_to_euclid_size(size: PhysicalSize<u32>) -> Size2D<u32, DevicePixel
 
 const INITIAL_WINDOW_TITLE: &str = "Rigging";
 
+#[allow(dead_code)] // Some fields unused but preserved from servoshell API
 pub struct Window {
     winit_window: winit::window::Window,
     screen_size: Size2D<u32, DeviceIndependentPixel>,
@@ -55,6 +56,7 @@ pub struct Window {
     webview_relative_mouse_point: Cell<Point2D<f32, DevicePixel>>,
 }
 
+#[allow(dead_code)] // Some methods unused but preserved from servoshell API
 impl Window {
     pub(crate) fn new(
         servoshell_preferences: &ServoShellPreferences,

@@ -20,9 +20,9 @@ use url::Url;
 use crate::servoshell::running_app_state::{RunningAppState, WebViewCollection};
 
 // This should vary by zoom level and maybe actual text size (focused or under cursor)
-#[cfg_attr(any(target_os = "android", target_env = "ohos"), expect(dead_code))]
+#[allow(dead_code)] // Preserved from servoshell API
 pub(crate) const LINE_HEIGHT: f32 = 76.0;
-#[cfg_attr(any(target_os = "android", target_env = "ohos"), expect(dead_code))]
+#[allow(dead_code)] // Preserved from servoshell API
 pub(crate) const LINE_WIDTH: f32 = 76.0;
 
 /// <https://github.com/web-platform-tests/wpt/blob/9320b1f724632c52929a3fdb11bdaf65eafc7611/webdriver/tests/classic/set_window_rect/set.py#L287-L290>
@@ -56,6 +56,8 @@ pub(crate) struct ServoShellWindow {
     pending_favicon_loads: RefCell<Vec<WebViewId>>,
 }
 
+/// Methods on ServoShellWindow - many are unused in Rigging but preserved from servoshell API
+#[allow(dead_code)]
 impl ServoShellWindow {
     pub(crate) fn new(platform_window: Rc<dyn PlatformWindow>) -> Self {
         Self {
@@ -286,6 +288,7 @@ impl ServoShellWindow {
 /// A `PlatformWindow` abstracts away the differents kinds of platform windows that might
 /// be used in a servoshell execution. This currently includes headed (winit) and headless
 /// windows.
+#[allow(dead_code)] // Many methods unused in Rigging but preserved from servoshell API
 pub(crate) trait PlatformWindow {
     fn id(&self) -> ServoShellWindowId;
     fn screen_geometry(&self) -> ScreenGeometry;

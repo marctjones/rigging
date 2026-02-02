@@ -46,6 +46,9 @@ servo = [
     "dep:egui-winit",
     "dep:accesskit",
 ]
+# Optional Servo features (not yet implemented)
+gamepad = []
+webxr = []
 
 [dependencies]
 # URL parsing

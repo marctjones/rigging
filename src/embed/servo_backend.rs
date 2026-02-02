@@ -21,6 +21,7 @@ use std::process::{Command, Stdio};
 use std::path::PathBuf;
 
 /// Find the servo binary
+#[allow(dead_code)] // May be used for subprocess approach in future
 fn find_servo_binary() -> Option<PathBuf> {
     // Check common locations
     let candidates = [
@@ -53,6 +54,7 @@ fn find_servo_binary() -> Option<PathBuf> {
 }
 
 /// Run the browser with Servo engine (subprocess approach)
+#[allow(dead_code)] // Alternative API, currently using servoshell_backend
 pub fn run_browser(
     config: BrowserConfig,
     event_callback: Option<EventCallback>,

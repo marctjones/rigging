@@ -17,7 +17,7 @@
 use super::config::BrowserConfig;
 use super::events::{BrowserEvent, EventCallback};
 use super::EmbedError;
-use log::{info, warn};
+// use log::{info, warn}; // Unused currently
 
 /// Run the browser with the given configuration
 ///
@@ -135,6 +135,7 @@ pub fn run_browser(
 }
 
 /// Helper to emit events if a callback is registered
+#[allow(dead_code)] // Will be used when event system is re-enabled
 fn emit_event(callback: &Option<EventCallback>, event: BrowserEvent) {
     if let Some(ref cb) = callback {
         cb(event);
