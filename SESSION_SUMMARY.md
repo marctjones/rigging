@@ -46,44 +46,62 @@ ServoShellEventLoop::Winit(
 - `docs: Update implementation plan to reflect GUI window completion` (c085fdd)
 - `docs: Add GNOME Wayland compatibility guide` (52e4aa7)
 
-### 2. Connector Integration Progress 🚧 IN PROGRESS
+### 2. Connector Integration Complete ✅
 
 **Goal**: Enable Rigging's transport-aware connectors (Unix sockets, Tor) to work with Servo's HTTP client.
 
-**What We Discovered**:
+**Solution Implemented**: FlexibleConnector enum with manual vtable for type erasure
 
-1. ✅ **ServoBuilder already has** `.with_connector()` method (servo.rs:1294-1300)
-2. ✅ **create_http_client_with_connector()** already exists (net/connector.rs:637)
-3. ✅ **Rigging's connectors** all implement `Service<Uri>` correctly
-4. ❌ **Missing piece**: `HttpState::client` is typed as `ServoClient` (fixed connector type), but custom connectors create different types
-
-**The Type System Challenge**:
+**Architecture**:
 ```rust
-// HttpState expects this specific type:
-pub type ServoClient = Client<InstrumentedConnector<ProxyConnector>, BoxedBody>;
+// Enum supporting both default and custom connectors
+pub enum FlexibleConnector {
+    Default(InstrumentedConnector<ProxyConnector>),
+    Custom(Arc<Mutex<Box<dyn DynConnector>>>),
+}
 
-// But custom connectors return:
-Client<UnixConnector, BoxedBody>  // Different type!
-Client<TorConnector, BoxedBody>   // Different type!
+// Manual vtable for type-erased connections (avoids Pin<&mut Self> dyn-incompatibility)
+pub trait DynConnection: Send + Sync {
+    fn dyn_poll_read(&mut self, cx: &mut Context<'_>, buf: ReadBufCursor<'_>) -> Poll<Result<(), io::Error>>;
+    fn dyn_poll_write(&mut self, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>>;
+    fn dyn_poll_flush(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>>;
+    fn dyn_poll_shutdown(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>>;
+    fn dyn_connected(&self) -> Connected;
+}
+
+// Type-erased connection wrapper
+pub struct BoxedConnection {
+    inner: Box<dyn DynConnection>,
+}
+
+pub enum FlexibleConnection {
+    Default(<InstrumentedConnector<ProxyConnector> as Service<Uri>>::Response),
+    Custom(BoxedConnection),
+}
+
+pub type ServoClient = Client<FlexibleConnector, BoxedBody>;
 ```
 
 **Work Completed**:
-- ✅ Threaded `custom_connector` from ServoBuilder through to HTTP client creation
-- ✅ Modified `new_resource_threads()` to accept custom connector
-- ✅ Modified `create_http_states()` to accept custom connector
-- ✅ Identified the type system blocker
-- ✅ Documented three solution options (enum-based recommended)
+- ✅ Implemented FlexibleConnector enum (~290 lines)
+- ✅ Implemented DynConnection trait with manual vtable
+- ✅ Implemented BoxedConnection wrapper
+- ✅ Added Custom variant to FlexibleConnection
+- ✅ Implemented Read/Write/Connection traits for FlexibleConnection
+- ✅ Fixed MutexGuard Send issue (release lock before await)
+- ✅ Added Sync bound to C::Response in create_http_client_with_connector
+- ✅ Successfully compiled net and libservo
+- ✅ Threaded custom_connector from ServoBuilder through entire initialization chain
+- ✅ Modified create_http_states() to use FlexibleConnector when custom connector provided
 
-**Files Modified in Servo** (uncommitted, needs FlexibleConnector first):
-- `components/servo/servo.rs` - Pass custom_connector to resource threads
-- `components/net/resource_thread.rs` - Thread connector through call chain
-- `components/net/connector.rs` - Already has create_http_client_with_connector()
-
-**Documentation Created**:
-- `docs/CONNECTOR_INTEGRATION_STATUS.md` - Comprehensive status and next steps
+**Files Modified in Servo** (committed):
+- `components/servo/servo.rs` - Added ServoBuilder.with_connector() method
+- `components/net/resource_thread.rs` - Thread connector through to HTTP client creation
+- `components/net/connector.rs` - FlexibleConnector implementation (~290 lines added)
 
 **Commits**:
-- `docs: Document connector integration progress and remaining work` (8a1d6c2)
+- `feat: Add FlexibleConnector enum to support custom connectors` (fa55f1a)
+- `feat: Implement Custom variant for FlexibleConnector` (fd9afb1)
 
 ## Current State
 
@@ -96,29 +114,34 @@ Client<TorConnector, BoxedBody>   // Different type!
   - ✅ Event handling
   - ✅ GNOME Wayland compatibility fix
   - ✅ Production logging
-- 🚧 **2.4**: Connector trait (exists in Rigging, needs Servo integration)
-- 🚧 **2.5**: Wire Connector into Servo (threading complete, type system blocker)
-- ⏸️ **2.6**: Servo net component patch (blocked on FlexibleConnector)
+- ✅ **2.4**: Connector trait (exists in Rigging with Service<Uri> implementation)
+- ✅ **2.5**: Wire Connector into Servo (FlexibleConnector enum complete)
+- ✅ **2.6**: Servo net component patch (FlexibleConnector with manual vtable)
+- 🚧 **2.7**: Integration testing (next: wire up Rigging connectors to Servo)
 
 ## Next Steps
 
-### Immediate (Unblock Connector Integration)
+### Immediate (Integration Testing)
 
-1. **Implement FlexibleConnector enum** in Servo's net component:
-   ```rust
-   pub enum FlexibleConnector {
-       Default(InstrumentedConnector<ProxyConnector>),
-       Custom(CustomConnectorWrapper),
-   }
-   ```
+1. **Wire up Rigging connectors to Servo**:
+   - Test UnixConnector with ServoBuilder.with_connector()
+   - Verify ComposedConnector routing works correctly
+   - Ensure transport URLs flow through to connectors
 
-2. **Implement Service trait** for FlexibleConnector (dispatch logic)
+2. **Update servoshell app.rs**:
+   - Remove URL conversion hack (convert_transport_url)
+   - Pass ComposedConnector to ServoBuilder
+   - Test with `http::unix://` URLs
 
-3. **Update create_http_states()** to use FlexibleConnector
+3. **Test end-to-end with Harbor**:
+   - Start Flask backend on Unix socket
+   - Load `http::unix:///tmp/app.sock/` in Harbor
+   - Verify no TCP connections attempted
+   - Test relative URLs inherit transport
 
-4. **Test end-to-end**:
-   - Harbor with UnixConnector
-   - Standard HTTP with default connector
+4. **Add transport restrictions**:
+   - Implement BrowserConfig.allowed_transports
+   - Add external link detection
 
 ### Medium Term (After Connector Works)
 

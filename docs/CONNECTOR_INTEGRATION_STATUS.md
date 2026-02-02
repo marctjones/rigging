@@ -29,27 +29,50 @@ We've made significant progress on integrating Rigging's transport-aware connect
 - ✅ `servoshell/desktop/app.rs` calls `.with_connector(UnixConnector::dynamic())` (line 118)
 - ✅ Servo embedding code ready to inject connector
 
-## What's Incomplete ❌
+## What Was Completed ✅ (Phase 2.6)
 
-### The Type System Challenge
+### The Type System Solution
 
-**Problem**: `HttpState::client` is typed as `ServoClient`:
+**Problem Solved**: `HttpState::client` needed a single type that could handle both default and custom connectors.
+
+**Solution Implemented**: FlexibleConnector enum with manual vtable approach:
+
 ```rust
-pub struct HttpState {
-    pub client: ServoClient,  // = Client<InstrumentedConnector<ProxyConnector>, BoxedBody>
-    // ...
+// Enum connector supporting both default and custom variants
+pub enum FlexibleConnector {
+    Default(InstrumentedConnector<ProxyConnector>),
+    Custom(Arc<Mutex<Box<dyn DynConnector>>>),
 }
+
+// Manual vtable trait for type-erasing connections
+pub trait DynConnection: Send + Sync {
+    fn dyn_poll_read(&mut self, cx: &mut Context<'_>, buf: ReadBufCursor<'_>) -> Poll<Result<(), io::Error>>;
+    fn dyn_poll_write(&mut self, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>>;
+    fn dyn_poll_flush(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>>;
+    fn dyn_poll_shutdown(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>>;
+    fn dyn_connected(&self) -> Connected;
+}
+
+// Type-erased connection wrapper
+pub struct BoxedConnection {
+    inner: Box<dyn DynConnection>,
+}
+
+// FlexibleConnection dispatches to both variants
+pub enum FlexibleConnection {
+    Default(<InstrumentedConnector<ProxyConnector> as Service<Uri>>::Response),
+    Custom(BoxedConnection),
+}
+
+pub type ServoClient = Client<FlexibleConnector, BoxedBody>;
 ```
 
-But `create_http_client_with_connector<C>()` returns:
-```rust
-Client<C, BoxedBody>  // Different type for each connector!
-```
-
-**Why This Matters**:
-- HttpState.client field has a fixed type
-- Custom connectors would create a different client type
-- Rust's type system prevents mixing these at runtime
+**Why This Works**:
+- Single `ServoClient` type for all use cases
+- Zero-cost dispatch for Default variant (direct enum match)
+- Type-erased dispatch for Custom variant (manual vtable)
+- No unsafe code required
+- MutexGuard released before await (avoids Send issues)
 
 ### Options to Fix This
 
@@ -103,48 +126,37 @@ pub type ServoClient = Client<Box<dyn DynConnector>, BoxedBody>;
 - Hyper doesn't support trait object connectors well
 - Complex lifetime management
 
-## Recommended Next Steps
+## Next Steps (Integration Testing)
 
-1. **Implement Option 1** (Enum-Based Connector):
-   ```rust
-   // In servo/components/net/connector.rs
-   pub enum FlexibleConnector {
-       Default(InstrumentedConnector<ProxyConnector>),
-       Custom(CustomConnectorWrapper),
-   }
+FlexibleConnector is now fully implemented in Servo. The remaining work is integration and testing:
 
-   // Wrapper that type-erases specific connector types
-   struct CustomConnectorWrapper {
-       inner: Box<dyn ServiceImpl>,  // Need to define this trait
-   }
-   ```
+1. **Wire up Rigging's Connectors to Servo**:
+   - Test that UnixConnector works with ServoBuilder.with_connector()
+   - Verify ComposedConnector routes correctly
+   - Ensure transport-aware URLs flow through to connectors
 
-2. **Update create_http_states()** to use FlexibleConnector:
-   ```rust
-   let connector = if let Some(custom) = custom_connector {
-       FlexibleConnector::Custom(wrap_connector(custom))
-   } else {
-       FlexibleConnector::Default(default_connector())
-   };
+2. **Update Rigging's Servo Integration**:
+   - Remove URL conversion hack in `src/embed/servoshell_backend.rs`
+   - Pass ComposedConnector to ServoBuilder in app.rs
+   - Test that `http::unix://` URLs connect via Unix sockets
 
-   let client = Client::builder(TokioExecutor {})
-       .build(connector);
-   ```
+3. **Test End-to-End with Harbor**:
+   - Start Flask backend on Unix socket
+   - Load page via `http::unix:///tmp/app.sock/`
+   - Verify no TCP connections attempted
+   - Test relative URLs inherit transport from base
 
-3. **Implement Service for FlexibleConnector**:
-   Dispatch to either Default or Custom variant
+4. **Add Transport Restriction Config**:
+   - Implement BrowserConfig.allowed_transports
+   - Reject disallowed transport types at connector level
+   - Add external link detection for Harbor
 
-4. **Test End-to-End**:
-   - Harbor with UnixConnector
-   - Compass with TorConnector
-   - Standard browsing with default connector
+## Files Modified
 
-## Files Modified So Far
-
-### Servo Changes
-- ✅ `components/servo/servo.rs` - Pass custom_connector to new_resource_threads()
+### Servo Changes (COMPLETE)
+- ✅ `components/servo/servo.rs` - Added ServoBuilder.with_connector() method
 - ✅ `components/net/resource_thread.rs` - Thread custom_connector through to HTTP client creation
-- ⏸️ `components/net/connector.rs` - Needs FlexibleConnector implementation
+- ✅ `components/net/connector.rs` - FlexibleConnector with DynConnection manual vtable (~290 lines added)
 
 ### Rigging Changes
 - ✅ `src/servoshell/desktop/app.rs` - Calls .with_connector()
@@ -168,9 +180,13 @@ Once FlexibleConnector is implemented:
 - **Testing**: ~100 lines
 - **Total**: ~325 lines in Servo's net component
 
-## Current Blocker
+## Current Status
 
-Cannot proceed with end-to-end testing until FlexibleConnector enum is implemented. This is the last piece needed for full connector integration.
+✅ **FlexibleConnector COMPLETE** - Custom variant fully implemented with manual vtable approach.
+
+🚧 **Integration Testing IN PROGRESS** - Need to wire up Rigging's connectors and test end-to-end.
+
+The Servo-side infrastructure is complete. Next phase is Rigging-side integration and testing.
 
 ## References
 
