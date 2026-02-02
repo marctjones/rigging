@@ -40,14 +40,20 @@ Rigging is a **fork of servoshell's core embedding code** with browser chrome st
 
 ## Current Status
 
-**Phase 1 (Transport Layer)**: COMPLETE
+**Phase 1 (Transport Layer)**: ✅ COMPLETE
 - Transport-aware URL parsing works
 - TCP and Unix connectors work
 - Tor connector structure exists
 
-**Phase 2 (Servo Embedding)**: NOT STARTED - THIS IS THE CRITICAL WORK
+**Phase 2 (Servo Embedding)**: 🚧 IN PROGRESS
+- ✅ Directory structure set up
+- ✅ Core files copied from servoshell
+- ✅ GUI window implementation complete (headed_window.rs)
+- ✅ X11 backend forcing for GNOME Wayland compatibility
+- ⏳ Connector integration (not yet wired up)
+- ⏳ Servo net component patching (planned)
 
-Harbor and Compass are BLOCKED waiting for this phase.
+**GUI Status**: ✅ Working! Window appears, renders, and handles events correctly.
 
 ---
 
@@ -99,29 +105,32 @@ Servoshell has been analyzed. Key findings:
 | `desktop/dialog.rs` | 711 | egui dialogs |
 | Most of `headed_window.rs` | ~1,050 | egui integration |
 
-### 2.1 Set Up Directory Structure
-- [ ] Create `src/servoshell/` directory in Rigging
-- [ ] Create `src/servoshell/desktop/` subdirectory
-- [ ] Set up module declarations
+### 2.1 Set Up Directory Structure ✅ COMPLETE
+- [x] Create `src/servoshell/` directory in Rigging
+- [x] Create `src/servoshell/desktop/` subdirectory
+- [x] Set up module declarations
 
-### 2.2 Copy Core Files (Minimal Changes)
-- [ ] Copy `running_app_state.rs` → `src/servoshell/running_app_state.rs`
-- [ ] Copy `window.rs` → `src/servoshell/window.rs`
-- [ ] Copy `desktop/app.rs` → `src/servoshell/desktop/app.rs`
-- [ ] Copy `desktop/event_loop.rs` → `src/servoshell/desktop/event_loop.rs`
-- [ ] Copy `desktop/keyutils.rs` → `src/servoshell/desktop/keyutils.rs`
-- [ ] Copy `desktop/headless_window.rs` → `src/servoshell/desktop/headless_window.rs`
-- [ ] Fix imports and module paths
-- [ ] Verify it compiles (will need servo dependency)
+### 2.2 Copy Core Files (Minimal Changes) ✅ COMPLETE
+- [x] Copy `running_app_state.rs` → `src/servoshell/running_app_state.rs`
+- [x] Copy `window.rs` → `src/servoshell/window.rs`
+- [x] Copy `desktop/app.rs` → `src/servoshell/desktop/app.rs`
+- [x] Copy `desktop/event_loop.rs` → `src/servoshell/desktop/event_loop.rs`
+- [x] Copy `desktop/keyutils.rs` → `src/servoshell/desktop/keyutils.rs`
+- [x] Copy `desktop/headless_window.rs` → `src/servoshell/desktop/headless_window.rs`
+- [x] Fix imports and module paths
+- [x] Verify it compiles (will need servo dependency)
 
-### 2.3 Extract Core from headed_window.rs
-- [ ] Read `desktop/headed_window.rs` (1,350 lines)
-- [ ] Identify PlatformWindow trait implementation (~200 lines)
-- [ ] Identify winit/surfman setup code (~100 lines)
-- [ ] Identify event handling code (~100 lines)
-- [ ] Remove ALL egui code (~700+ lines)
-- [ ] Remove dialog display logic
-- [ ] Create minimal `src/servoshell/desktop/headed_window.rs`
+### 2.3 Extract Core from headed_window.rs ✅ COMPLETE
+- [x] Read `desktop/headed_window.rs` (1,350 lines)
+- [x] Identify PlatformWindow trait implementation (~200 lines)
+- [x] Identify winit/surfman setup code (~100 lines)
+- [x] Identify event handling code (~100 lines)
+- [x] Remove ALL egui code (~700+ lines)
+- [x] Remove dialog display logic
+- [x] Create minimal `src/servoshell/desktop/headed_window.rs` (~400 lines)
+- [x] Force X11 backend on Linux for GNOME Wayland compatibility (critical fix)
+- [x] Verify window appears and handles events correctly
+- [x] Clean up debug logging to production level
 
 ### 2.4 Add Connector Trait
 - [ ] Define `Connector` trait in `src/connector/mod.rs`:
