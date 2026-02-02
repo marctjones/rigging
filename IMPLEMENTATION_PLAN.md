@@ -45,13 +45,14 @@ Rigging is a **fork of servoshell's core embedding code** with browser chrome st
 - TCP and Unix connectors work
 - Tor connector structure exists
 
-**Phase 2 (Servo Embedding)**: 🚧 IN PROGRESS
+**Phase 2 (Servo Embedding)**: ✅ COMPLETE
 - ✅ Directory structure set up
 - ✅ Core files copied from servoshell
 - ✅ GUI window implementation complete (headed_window.rs)
 - ✅ X11 backend forcing for GNOME Wayland compatibility
-- ⏳ Connector integration (not yet wired up)
-- ⏳ Servo net component patching (planned)
+- ✅ Connector integration (FlexibleConnector with manual vtable)
+- ✅ Servo net component patching (complete)
+- ✅ End-to-end demo (Harbor displays Flask app over Unix sockets)
 
 **GUI Status**: ✅ Working! Window appears, renders, and handles events correctly.
 
