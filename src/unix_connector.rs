@@ -66,10 +66,16 @@ impl hyper::rt::Read for UnixConnection {
         match Pin::new(&mut self.get_mut().stream).poll_read(cx, &mut read_buf) {
             Poll::Ready(Ok(())) => {
                 let filled = read_buf.filled().len();
+                if filled > 0 {
+                    eprintln!("[UnixConnection] Read {} bytes", filled);
+                }
                 unsafe { buf.advance(filled) };
                 Poll::Ready(Ok(()))
             }
-            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+            Poll::Ready(Err(e)) => {
+                eprintln!("[UnixConnection] Read error: {}", e);
+                Poll::Ready(Err(e))
+            }
             Poll::Pending => Poll::Pending,
         }
     }
@@ -81,7 +87,26 @@ impl hyper::rt::Write for UnixConnection {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, std::io::Error>> {
-        Pin::new(&mut self.get_mut().stream).poll_write(cx, buf)
+        match Pin::new(&mut self.get_mut().stream).poll_write(cx, buf) {
+            Poll::Ready(Ok(n)) => {
+                if n > 0 {
+                    eprintln!("[UnixConnection] Wrote {} bytes", n);
+                    // Show first line of HTTP request for debugging
+                    if let Ok(s) = std::str::from_utf8(&buf[..n.min(100)]) {
+                        let first_line = s.lines().next().unwrap_or("");
+                        if !first_line.is_empty() {
+                            eprintln!("[UnixConnection] Request: {}", first_line);
+                        }
+                    }
+                }
+                Poll::Ready(Ok(n))
+            }
+            Poll::Ready(Err(e)) => {
+                eprintln!("[UnixConnection] Write error: {}", e);
+                Poll::Ready(Err(e))
+            }
+            Poll::Pending => Poll::Pending,
+        }
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
@@ -92,6 +117,7 @@ impl hyper::rt::Write for UnixConnection {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), std::io::Error>> {
+        eprintln!("[UnixConnection] Shutting down connection");
         Pin::new(&mut self.get_mut().stream).poll_shutdown(cx)
     }
 }
