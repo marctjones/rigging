@@ -28,17 +28,19 @@ pub fn run_browser(
     }
 
     info!("Initializing browser (Servoshell direct embedding)...");
-    debug!("Window: {}x{}", config.width, config.height);
-    debug!("URL: {}", config.url);
+    info!("Window: {}x{}", config.width, config.height);
+    info!("URL: {}", config.url);
 
     // Convert transport-aware URL to standard URL for Servo's URL parser only
     // The actual HTTP requests will use the original transport URL via the connector
     let servo_url_str = convert_transport_url_for_parser(&config.url);
-    debug!("URL for Servo parser: {} -> {}", config.url, servo_url_str);
+    info!("URL for Servo parser: {} -> {}", config.url, servo_url_str);
 
     // Parse URL using Servo's parser
     let _url = ServoUrl::parse(&servo_url_str)
         .map_err(|e| EmbedError::InitFailed(format!("Invalid URL '{}': {}", servo_url_str, e)))?;
+
+    info!("Parsed URL successfully, proceeding with Servo initialization...");
 
     // Create servoshell preferences
     let prefs = ServoShellPreferences {

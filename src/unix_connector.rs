@@ -162,22 +162,32 @@ impl Service<Uri> for UnixConnector {
     fn call(&mut self, uri: Uri) -> Self::Future {
         // Try to parse as transport URL to extract socket path
         let uri_str = uri.to_string();
+        eprintln!("[UnixConnector] Attempting to connect to URI: {}", uri_str);
+
         let socket_path = if let Ok(transport_url) = crate::TransportUrl::parse(&uri_str) {
             if let Some(path) = transport_url.unix_socket_path() {
+                eprintln!("[UnixConnector] Parsed socket path: {}", path);
                 PathBuf::from(path)
             } else {
+                eprintln!("[UnixConnector] No socket path in transport URL, using default: {:?}", self.socket_path);
                 self.socket_path.clone()
             }
         } else {
             // Fallback to configured socket path
+            eprintln!("[UnixConnector] Failed to parse transport URL, using default: {:?}", self.socket_path);
             self.socket_path.clone()
         };
 
         Box::pin(async move {
+            eprintln!("[UnixConnector] Connecting to socket: {:?}", socket_path);
             let stream = UnixStream::connect(&socket_path)
                 .await
-                .map_err(TransportError::Io)?;
+                .map_err(|e| {
+                    eprintln!("[UnixConnector] Connection failed: {}", e);
+                    TransportError::Io(e)
+                })?;
 
+            eprintln!("[UnixConnector] Successfully connected!");
             Ok(UnixConnection::new(stream))
         })
     }

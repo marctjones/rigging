@@ -114,7 +114,27 @@ impl App {
         if self.servoshell_preferences.use_custom_connector {
             info!("   Enabling custom Unix connector");
             use crate::unix_connector::UnixConnector;
-            let connector = UnixConnector::dynamic();
+            use crate::TransportUrl;
+
+            // Parse the original URL to extract socket path
+            let connector = if let Some(url_str) = &self.servoshell_preferences.url {
+                if let Ok(transport_url) = TransportUrl::parse(url_str) {
+                    if let Some(socket_path) = transport_url.unix_socket_path() {
+                        info!("   Unix socket path from URL: {}", socket_path);
+                        UnixConnector::new(socket_path)
+                    } else {
+                        info!("   Using dynamic Unix connector");
+                        UnixConnector::dynamic()
+                    }
+                } else {
+                    info!("   Using dynamic Unix connector");
+                    UnixConnector::dynamic()
+                }
+            } else {
+                info!("   Using dynamic Unix connector");
+                UnixConnector::dynamic()
+            };
+
             servo_builder = servo_builder.with_connector(connector);
         }
 
