@@ -80,6 +80,11 @@ impl App {
         println!("   Mode: {}", if active_event_loop.is_some() { "HEADED (GUI)" } else { "HEADLESS" });
         println!("   Initial URL: {}", self.initial_url);
 
+        // CRITICAL: Initialize resource reader before creating Servo
+        // This allows Servo to load fonts, UA stylesheets, and other built-in resources
+        println!("   Initializing resource reader...");
+        crate::servoshell::resources::init();
+
         // TODO: Port userscripts support once API is available
         // let mut user_content_manager = UserContentManager::new();
         // for script in load_userscripts(self.servoshell_preferences.userscripts_directory.as_deref())
@@ -244,8 +249,7 @@ impl ApplicationHandler<AppEvent> for App {
         if !self.pump_servo_event_loop() {
             event_loop.exit();
         }
-        // Block until the window gets an event
-        event_loop.set_control_flow(ControlFlow::Wait);
+        // Don't set ControlFlow here - let about_to_wait handle it
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, app_event: AppEvent) {
@@ -268,9 +272,32 @@ impl ApplicationHandler<AppEvent> for App {
         if !self.pump_servo_event_loop() {
             event_loop.exit();
         }
+        // Don't set ControlFlow here - let about_to_wait handle it
+    }
 
-        // Block until the window gets an event
-        event_loop.set_control_flow(ControlFlow::Wait);
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static ABOUT_TO_WAIT_COUNT: AtomicU64 = AtomicU64::new(0);
+        let count = ABOUT_TO_WAIT_COUNT.fetch_add(1, Ordering::Relaxed);
+        if count % 1000 == 0 {
+            eprintln!("[ABOUT_TO_WAIT] Called #{} times", count + 1);
+        }
+
+        // Continuously pump Servo's event loop to run compositor and process rendering
+        if !self.pump_servo_event_loop() {
+            event_loop.exit();
+            return;
+        }
+
+        // Request redraws for all windows to keep rendering continuously
+        if let AppState::Running(state) = &self.state {
+            for (_id, window) in state.windows().iter() {
+                window.platform_window().request_repaint(window);
+            }
+        }
+
+        // Keep the event loop running to continuously update
+        event_loop.set_control_flow(ControlFlow::Poll);
     }
 }
 

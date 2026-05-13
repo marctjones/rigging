@@ -230,12 +230,16 @@ impl RunningAppState {
         platform_window: Rc<dyn PlatformWindow>,
         initial_url: Url,
     ) {
+        eprintln!("[CREATE_WINDOW] ========== Creating window for URL: {} ==========", initial_url);
         info!("🏠 Creating window for URL: {}", initial_url);
         let window = Rc::new(ServoShellWindow::new(platform_window));
         let window_id = window.id();
 
-        window.create_and_activate_toplevel_webview(self.clone(), initial_url);
+        eprintln!("[CREATE_WINDOW] Calling create_and_activate_toplevel_webview");
+        window.create_and_activate_toplevel_webview(self.clone(), initial_url.clone());
+        eprintln!("[CREATE_WINDOW] Webview created, inserting window into collection");
         self.windows.borrow_mut().insert(window_id, window);
+        eprintln!("[CREATE_WINDOW] ✓ Window registered in state");
         info!("   ✓ Window registered in state");
     }
 
@@ -293,6 +297,14 @@ impl RunningAppState {
     ///
     /// Returns true if the event loop should continue spinning and false if it should exit.
     pub(crate) fn spin_event_loop(self: &Rc<Self>) -> bool {
+        static mut SPIN_COUNT: u64 = 0;
+        unsafe {
+            SPIN_COUNT += 1;
+            if SPIN_COUNT % 100 == 1 {
+                eprintln!("[SPIN_EVENT_LOOP] Spin #{} (logging every 100th call)", SPIN_COUNT);
+            }
+        }
+
         // TODO: Port WebDriver support
         // self.handle_webdriver_messages();
 

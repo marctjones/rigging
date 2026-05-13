@@ -113,6 +113,8 @@ impl Window {
         let screen_size = (winit_size_to_euclid_size(screen_size).to_f64() / screen_scale).to_u32();
         let inner_size = winit_window.inner_size();
 
+        eprintln!("[WINDOW_INIT] Window inner size: {}x{}", inner_size.width, inner_size.height);
+
         // Create rendering contexts
         let display_handle = event_loop
             .display_handle()
@@ -146,7 +148,8 @@ impl Window {
         // Show window after all setup is complete
         window.winit_window.set_visible(true);
         window.winit_window.set_minimized(false);
-        window.winit_window.set_maximized(true);
+        // Don't start maximized - causes rendering issues
+        // window.winit_window.set_maximized(true);
         window.winit_window.focus_window();
         window.winit_window.request_redraw();
 
@@ -216,6 +219,12 @@ impl PlatformWindow for Window {
     }
 
     fn request_repaint(&self, _: &ServoShellWindow) {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static REQUEST_COUNT: AtomicU64 = AtomicU64::new(0);
+        let count = REQUEST_COUNT.fetch_add(1, Ordering::Relaxed);
+        if count % 1000 == 0 {
+            eprintln!("[REQUEST_REPAINT] Request #{}", count + 1);
+        }
         trace!("📢 Requesting window redraw from winit");
         self.winit_window.request_redraw();
     }
@@ -369,7 +378,9 @@ impl PlatformWindow for Window {
                 self.inner_size.set(new_size);
             }
             WindowEvent::CloseRequested => {
-                info!("Window close requested");
+                eprintln!("[CLOSE_REQUESTED] ========== User clicked close button ==========");
+                info!("Window close requested - scheduling window close");
+                window.schedule_close();
             }
             WindowEvent::ModifiersChanged(new_modifiers) => {
                 trace!("Modifiers changed: {:?}", new_modifiers.state());
@@ -379,6 +390,12 @@ impl PlatformWindow for Window {
                 // Paint webview to window
                 // WARNING: do not defer painting or presenting to some later tick of the event
                 // loop or the window may become unresponsive! (servo#30312)
+                use std::sync::atomic::{AtomicU64, Ordering};
+                static REDRAW_COUNT: AtomicU64 = AtomicU64::new(0);
+                let count = REDRAW_COUNT.fetch_add(1, Ordering::Relaxed);
+                if count % 1000 == 0 {
+                    eprintln!("[REDRAW_REQUESTED] Event #{}", count + 1);
+                }
                 trace!("Repainting webviews");
                 window.repaint_webviews();
             }

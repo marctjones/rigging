@@ -12,3 +12,4 @@ pub mod window;
 pub mod desktop;
 pub mod stubs;
 pub mod parser;
+pub mod resources;

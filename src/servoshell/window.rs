@@ -79,14 +79,19 @@ impl ServoShellWindow {
         state: Rc<RunningAppState>,
         url: Url,
     ) -> WebView {
+        eprintln!("[WINDOW] ========== create_and_activate_toplevel_webview ==========");
+        eprintln!("[WINDOW] URL: {}", url);
         info!("🌐 Creating and activating webview for URL: {}", url);
-        let webview = self.create_toplevel_webview(state, url);
+        let webview = self.create_toplevel_webview(state, url.clone());
+        eprintln!("[WINDOW] Webview created");
         self.activate_webview(webview.id());
+        eprintln!("[WINDOW] ✓ Webview activated");
         info!("   ✓ Webview {} activated", webview.id());
         webview
     }
 
     pub(crate) fn create_toplevel_webview(&self, state: Rc<RunningAppState>, url: Url) -> WebView {
+        eprintln!("[WINDOW] Building webview for URL: {}", url);
         debug!("   Building webview...");
         let webview = WebViewBuilder::new(state.servo(), self.platform_window.rendering_context())
             .url(url.clone())
@@ -94,9 +99,12 @@ impl ServoShellWindow {
             .delegate(state.clone())
             .build();
 
+        eprintln!("[WINDOW] WebView built");
+        eprintln!("[WINDOW] Setting theme and adding to collection...");
         debug!("   Setting theme and adding to collection...");
         webview.notify_theme_change(self.platform_window.theme());
         self.add_webview(webview.clone());
+        eprintln!("[WINDOW] ✓ Webview created for {}", url);
         debug!("   ✓ Webview {} created for {}", webview.id(), url);
         webview
     }
@@ -109,17 +117,25 @@ impl ServoShellWindow {
         };
 
         trace!("🖌️  Repainting webview {}", webview.id());
-        self.platform_window()
-            .rendering_context()
-            .make_current()
-            .unwrap();
+
+        // Make the offscreen rendering context current and paint into it
+        let rendering_context = self.platform_window().rendering_context();
+        rendering_context.make_current().unwrap();
         trace!("   Rendering context made current");
 
-        webview.paint();
-        trace!("   Webview painted");
+        // Prepare the framebuffer for rendering
+        rendering_context.prepare_for_rendering();
+        trace!("   Framebuffer prepared for rendering");
 
+        webview.paint();
+        trace!("   Webview painted to offscreen framebuffer");
+
+        // Present the rendered frame
         self.platform_window().rendering_context().present();
         trace!("   ✓ Frame presented to window");
+
+        // Request another redraw to keep the rendering loop going
+        self.platform_window().request_repaint(self);
     }
 
     /// Whether or not this [`ServoShellWindow`] has any [`WebView`]s.
@@ -205,10 +221,11 @@ impl ServoShellWindow {
         // Delegate handlers may have asked us to present or update compositor contents.
         // Currently, egui-file-dialog dialogs need to be constantly redrawn or animations aren't fluid.
         let needs_repaint = self.needs_repaint.take();
-        if updated_user_interface || needs_repaint {
-            trace!("🎨 Requesting repaint (UI updated: {}, needs repaint: {})", updated_user_interface, needs_repaint);
-            self.platform_window.request_repaint(self);
-        }
+
+        // ALWAYS request repaints for continuous rendering
+        // TODO: Optimize this to only repaint when Servo has new content
+        trace!("🎨 Requesting repaint (UI updated: {}, needs repaint: {})", updated_user_interface, needs_repaint);
+        self.platform_window.request_repaint(self);
     }
 
     /// Close the given [`WebView`] via its [`WebViewId`].
